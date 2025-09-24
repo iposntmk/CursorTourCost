@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased min-h-screen;
+}
+
+#root {
+  @apply min-h-screen;
+}
+
+a {
+  @apply text-primary-600 hover:text-primary-500 font-medium;
+}
+
+button:focus {
+  @apply outline-none ring-2 ring-primary-400 ring-offset-2;
+}
