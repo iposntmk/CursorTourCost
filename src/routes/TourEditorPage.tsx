@@ -37,7 +37,7 @@ const TourEditorPage = () => {
   const isEditing = Boolean(params.tourId);
   const { data: existingTour, isLoading: loadingTour, isError } = useTour(params.tourId);
   const { create, update } = useTourMutations();
-  const { draft, resetDraft } = useTourDraft();
+  const { draft, rawGeminiData, resetDraft } = useTourDraft();
   const { data: schema } = useActiveSchema();
   const { showToast } = useToast();
 
@@ -296,9 +296,9 @@ const TourEditorPage = () => {
       {/* Gemini Data Modal */}
       {showGeminiData && draft && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden rounded-lg bg-white shadow-xl">
+          <div className="max-w-6xl w-full mx-4 max-h-[90vh] overflow-hidden rounded-lg bg-white shadow-xl">
             <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-              <h3 className="text-lg font-semibold text-slate-900">Dữ liệu gốc từ Gemini</h3>
+              <h3 className="text-lg font-semibold text-slate-900">Dữ liệu từ Gemini</h3>
               <button
                 type="button"
                 onClick={() => setShowGeminiData(false)}
@@ -310,31 +310,50 @@ const TourEditorPage = () => {
               </button>
             </div>
             <div className="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
-              <div className="space-y-4">
+              <div className="grid gap-6 md:grid-cols-2">
+                {/* Raw Gemini Data */}
                 <div>
-                  <h4 className="text-sm font-semibold text-slate-700 mb-2">Dữ liệu đã chuyển đổi sang TourData:</h4>
-                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                    <pre className="text-xs text-slate-700 overflow-x-auto">
+                  <h4 className="text-sm font-semibold text-slate-700 mb-2">📥 Dữ liệu gốc từ Gemini:</h4>
+                  <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                    <pre className="text-xs text-slate-700 overflow-x-auto max-h-96">
+                      {rawGeminiData ? JSON.stringify(rawGeminiData, null, 2) : 'Không có dữ liệu gốc'}
+                    </pre>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => navigator.clipboard.writeText(JSON.stringify(rawGeminiData, null, 2))}
+                    className="mt-2 px-3 py-1 text-xs font-medium text-blue-600 bg-blue-100 rounded-md hover:bg-blue-200 transition"
+                  >
+                    Copy Raw Data
+                  </button>
+                </div>
+
+                {/* Converted TourData */}
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-700 mb-2">📤 Dữ liệu đã chuyển đổi:</h4>
+                  <div className="rounded-lg border border-green-200 bg-green-50 p-4">
+                    <pre className="text-xs text-slate-700 overflow-x-auto max-h-96">
                       {JSON.stringify(draft, null, 2)}
                     </pre>
                   </div>
-                </div>
-                <div className="flex justify-end gap-2">
                   <button
                     type="button"
                     onClick={() => navigator.clipboard.writeText(JSON.stringify(draft, null, 2))}
-                    className="px-3 py-2 text-sm font-medium text-slate-600 bg-slate-100 rounded-md hover:bg-slate-200 transition"
+                    className="mt-2 px-3 py-1 text-xs font-medium text-green-600 bg-green-100 rounded-md hover:bg-green-200 transition"
                   >
-                    Copy JSON
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowGeminiData(false)}
-                    className="px-3 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 transition"
-                  >
-                    Đóng
+                    Copy Converted Data
                   </button>
                 </div>
+              </div>
+              
+              <div className="mt-6 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowGeminiData(false)}
+                  className="px-4 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 transition"
+                >
+                  Đóng
+                </button>
               </div>
             </div>
           </div>

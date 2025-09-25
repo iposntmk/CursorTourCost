@@ -212,7 +212,7 @@ const AiExtractionPage = () => {
   const handleLoadToTour = () => {
     if (!parsedJson) return;
     const tour: TourData = normalizeAiTour(parsedJson);
-    setDraft(tour);
+    setDraft(tour, parsedJson); // Lưu cả normalized data và raw data
     showToast({ message: 'Đã nạp dữ liệu vào biểu mẫu tour.', type: 'success' });
     navigate('/tours/new');
   };

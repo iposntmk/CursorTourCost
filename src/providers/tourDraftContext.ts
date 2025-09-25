@@ -3,7 +3,8 @@ import { TourData } from '../types/tour';
 
 export type TourDraftContextValue = {
   draft: TourData | null;
-  setDraft: (value: TourData | null) => void;
+  rawGeminiData: unknown;
+  setDraft: (value: TourData | null, rawData?: unknown) => void;
   resetDraft: () => void;
 };
 
