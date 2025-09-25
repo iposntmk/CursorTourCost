@@ -51,7 +51,13 @@ export const fetchActiveSchemaFromApi = async () => {
   return handleResponse(res);
 };
 
-export const requestAiExtraction = async (body: { imageUrl: string; overrides?: Record<string, unknown> }) => {
+export const requestAiExtraction = async (body: {
+  imageUrl?: string;
+  imageBase64?: string;
+  imageMimeType?: string;
+  imageName?: string;
+  overrides?: Record<string, unknown>;
+}) => {
   const res = await fetch(`${BASE_URL}/ai/extract`, {
     method: 'POST',
     headers: withApiKey({ 'Content-Type': 'application/json' }),
