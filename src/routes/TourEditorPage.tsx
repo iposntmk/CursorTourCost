@@ -45,6 +45,7 @@ const TourEditorPage = () => {
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [schemaError, setSchemaError] = useState<string | null>(null);
+  const [showGeminiData, setShowGeminiData] = useState(false);
 
   const guidesQuery = useMasterData('guides');
   const companiesQuery = useMasterData('companies');
@@ -258,6 +259,9 @@ const TourEditorPage = () => {
                 <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full">
                   ✓ Dữ liệu AI đã lưu
                 </span>
+                <SecondaryButton type="button" onClick={() => setShowGeminiData(true)}>
+                  Xem dữ liệu AI
+                </SecondaryButton>
                 <SecondaryButton type="button" onClick={handleResetDraft}>
                   Xoá dữ liệu AI
                 </SecondaryButton>
@@ -288,6 +292,54 @@ const TourEditorPage = () => {
         ) : null}
       </Card>
       <TourForm value={tour} onChange={setTour} masterData={masterData} />
+
+      {/* Gemini Data Modal */}
+      {showGeminiData && draft && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="max-w-4xl w-full mx-4 max-h-[90vh] overflow-hidden rounded-lg bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
+              <h3 className="text-lg font-semibold text-slate-900">Dữ liệu gốc từ Gemini</h3>
+              <button
+                type="button"
+                onClick={() => setShowGeminiData(false)}
+                className="text-slate-400 hover:text-slate-600 transition"
+              >
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[calc(90vh-80px)]">
+              <div className="space-y-4">
+                <div>
+                  <h4 className="text-sm font-semibold text-slate-700 mb-2">Dữ liệu đã chuyển đổi sang TourData:</h4>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                    <pre className="text-xs text-slate-700 overflow-x-auto">
+                      {JSON.stringify(draft, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => navigator.clipboard.writeText(JSON.stringify(draft, null, 2))}
+                    className="px-3 py-2 text-sm font-medium text-slate-600 bg-slate-100 rounded-md hover:bg-slate-200 transition"
+                  >
+                    Copy JSON
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowGeminiData(false)}
+                    className="px-3 py-2 text-sm font-medium text-white bg-primary-600 rounded-md hover:bg-primary-700 transition"
+                  >
+                    Đóng
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
