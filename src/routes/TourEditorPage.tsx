@@ -254,9 +254,14 @@ const TourEditorPage = () => {
           </CardTitle>
           <div className="flex flex-wrap items-center gap-3">
             {!isEditing && draft ? (
-              <SecondaryButton type="button" onClick={handleResetDraft}>
-                Xoá dữ liệu AI
-              </SecondaryButton>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded-full">
+                  ✓ Dữ liệu AI đã lưu
+                </span>
+                <SecondaryButton type="button" onClick={handleResetDraft}>
+                  Xoá dữ liệu AI
+                </SecondaryButton>
+              </div>
             ) : null}
             <SecondaryButton type="button" onClick={handleExportExcel}>
               Xuất Excel
