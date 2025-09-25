@@ -435,27 +435,94 @@ const AiExtractionPage = () => {
             {/* Structured Data Display */}
             {parsedJson && typeof parsedJson === 'object' ? (
               <div className="mb-6">
-                <h3 className="mb-3 text-lg font-semibold text-slate-800">Dữ liệu đã phân tích</h3>
-                <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-                  <div className="grid gap-4 md:grid-cols-2">
-                    {Object.entries(parsedJson).map(([key, value]) => (
-                      <div key={key} className="flex flex-col gap-1">
-                        <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                          {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
-                        </label>
-                        <div className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-800">
-                          {typeof value === 'object' && value !== null ? (
-                            <pre className="whitespace-pre-wrap font-mono text-xs">
-                              {JSON.stringify(value, null, 2)}
-                            </pre>
-                          ) : (
-                            <span className={value ? 'text-slate-900' : 'text-slate-400 italic'}>
-                              {value || 'Không có dữ liệu'}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-slate-800">Dữ liệu đã phân tích</h3>
+                  <div className="text-sm text-slate-500">
+                    {Object.keys(parsedJson).length} trường dữ liệu
+                  </div>
+                </div>
+                <div className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-full">
+                      <thead className="bg-slate-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Trường dữ liệu
+                          </th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Giá trị
+                          </th>
+                          <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Trạng thái
+                          </th>
+                          <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wide text-slate-500">
+                            Thao tác
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200">
+                        {Object.entries(parsedJson).map(([key, value], index) => {
+                          const hasValue = value && String(value).trim();
+                          const displayValue = typeof value === 'object' && value !== null 
+                            ? JSON.stringify(value, null, 2)
+                            : String(value || '');
+                          
+                          return (
+                            <tr key={key} className={index % 2 === 0 ? 'bg-white hover:bg-slate-25' : 'bg-slate-25 hover:bg-slate-50'}>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-medium text-slate-900">
+                                    {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                                  </span>
+                                  <span className="text-xs text-slate-400 font-mono">
+                                    ({key})
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 max-w-md">
+                                {typeof value === 'object' && value !== null ? (
+                                  <div className="relative">
+                                    <pre className="whitespace-pre-wrap font-mono text-xs text-slate-700 overflow-x-auto">
+                                      {displayValue}
+                                    </pre>
+                                    <button
+                                      type="button"
+                                      onClick={() => navigator.clipboard.writeText(displayValue)}
+                                      className="absolute top-1 right-1 rounded bg-slate-200 px-1 py-0.5 text-xs text-slate-600 hover:bg-slate-300 transition"
+                                    >
+                                      Copy
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <span className={`text-sm ${hasValue ? 'text-slate-900' : 'text-slate-400 italic'}`}>
+                                    {hasValue ? displayValue : 'Không có dữ liệu'}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                <span className={`inline-flex items-center rounded-full px-2 py-1 text-xs font-medium ${
+                                  hasValue 
+                                    ? 'bg-green-100 text-green-800' 
+                                    : 'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {hasValue ? '✓ Có dữ liệu' : '○ Trống'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                <button
+                                  type="button"
+                                  onClick={() => navigator.clipboard.writeText(hasValue ? displayValue : '')}
+                                  disabled={!hasValue}
+                                  className="text-xs text-slate-500 hover:text-slate-700 disabled:text-slate-300 disabled:cursor-not-allowed"
+                                >
+                                  Copy
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               </div>
