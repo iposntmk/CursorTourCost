@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, FormEvent, MutableRefObject, useEffect, useMemo, useRef, useState } from 'react';
 import Papa from 'papaparse';
 import { saveAs } from 'file-saver';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/common/Card';
@@ -28,40 +28,89 @@ const createEmptyFilters = (fields: MasterDataField[]) => {
   return filters;
 };
 
+type FieldElement = HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement;
+
 const MasterDataForm = ({
   type,
   record,
   onChange,
   showValidation,
+  registerFieldRef,
+  referenceData,
 }: {
   type: MasterDataType;
   record: MasterDataRecord;
   onChange: (key: string, value: string | number) => void;
   showValidation: boolean;
+  registerFieldRef: (key: string, element: FieldElement | null) => void;
+  referenceData: Partial<Record<MasterDataType, MasterDataRecord[]>>;
 }) => {
   const renderField = (field: MasterDataField) => {
     const value = (record as Record<string, unknown>)[field.key] ?? '';
-    const commonProps = {
-      className: clsx(
-        'mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:ring-0',
-        showValidation && !field.optional && String(value ?? '').trim() === ''
-          ? 'border-red-300 focus:border-red-400 focus:ring-red-100 bg-red-50/40'
-          : 'border-slate-200 focus:border-primary-400',
-      ),
-      value: value as string | number,
-      onChange: (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
-        onChange(field.key, field.type === 'number' ? Number(event.target.value || 0) : event.target.value),
-    };
+    const hasError = showValidation && !field.optional && String(value ?? '').trim() === '';
+    const baseClass = clsx(
+      'mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:ring-0',
+      hasError
+        ? 'border-red-300 focus:border-red-400 focus:ring-red-100 bg-red-50/40'
+        : 'border-slate-200 focus:border-primary-400',
+    );
+    const registerRef = (element: FieldElement | null) => registerFieldRef(field.key, element);
 
     switch (field.type) {
       case 'textarea':
-        return <textarea rows={3} {...commonProps} />;
+        return (
+          <textarea
+            rows={3}
+            className={baseClass}
+            value={String(value ?? '')}
+            onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange(field.key, event.target.value)}
+            ref={registerRef}
+          />
+        );
       case 'number':
-        return <input type="number" {...commonProps} />;
+        return (
+          <input
+            type="number"
+            className={baseClass}
+            value={value === '' ? '' : Number(value ?? 0)}
+            onChange={(event: ChangeEvent<HTMLInputElement>) => onChange(field.key, Number(event.target.value || 0))}
+            ref={registerRef}
+          />
+        );
       case 'select':
-        return <input {...commonProps} placeholder={`Nhập ID tham chiếu (${field.referenceType})`} />;
+        {
+          const options = field.referenceType ? referenceData[field.referenceType] ?? [] : [];
+          const currentValue = value === null || value === undefined ? '' : String(value);
+          const hasCurrentValue =
+            currentValue !== '' && options.some((option) => String(option.id ?? '') === currentValue);
+          return (
+            <select
+              className={baseClass}
+              value={currentValue}
+              onChange={(event: ChangeEvent<HTMLSelectElement>) => onChange(field.key, event.target.value)}
+              ref={registerRef}
+            >
+              <option value="">Chọn {field.label.toLowerCase()}</option>
+              {options.map((option) => (
+                <option key={option.id ?? option.name} value={String(option.id ?? '')}>
+                  {option.name}
+                </option>
+              ))}
+              {!hasCurrentValue && currentValue ? (
+                <option value={currentValue}>{currentValue}</option>
+              ) : null}
+            </select>
+          );
+        }
       default:
-        return <input {...commonProps} />;
+        return (
+          <input
+            className={baseClass}
+            value={String(value ?? '')}
+            onChange={(event: ChangeEvent<HTMLInputElement>) => onChange(field.key, event.target.value)}
+            ref={registerRef}
+          />
+        );
     }
   };
 
@@ -91,15 +140,20 @@ const MasterDataPage = () => {
   const [filters, setFilters] = useState<Record<string, string>>(() =>
     createEmptyFilters(MASTER_DATA_CONFIGS['guides'].fields),
   );
+  const fieldRefs: MutableRefObject<Record<string, FieldElement | null>> = useRef({});
 
   const { data, isLoading, isError } = useMasterData(selectedType);
   const { create, update, remove } = useMasterDataMutations(selectedType);
   const { showToast } = useToast();
 
+  const provincesQuery = useMasterData('provinces');
+  const costTypesQuery = useMasterData('cost_types');
+
   const config = MASTER_DATA_CONFIGS[selectedType];
 
   useEffect(() => {
     setFilters(createEmptyFilters(config.fields));
+    fieldRefs.current = {};
   }, [config]);
 
   const handleSelectType = (type: MasterDataType) => {
@@ -109,6 +163,7 @@ const MasterDataPage = () => {
     setBulkText('');
     setIsFormOpen(false);
     setShowValidation(false);
+    fieldRefs.current = {};
   };
 
   const handleFormChange = (key: string, value: string | number) => {
@@ -121,15 +176,23 @@ const MasterDataPage = () => {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const payload = { ...formData };
-    const hasMissingRequired = config.fields.some((field) => {
+    const missingField = config.fields.find((field) => {
       if (field.optional) return false;
       const value = (payload as Record<string, unknown>)[field.key];
-      if (field.type === 'number') return value === null || value === undefined || Number.isNaN(value as number);
+      if (field.type === 'number') {
+        if (value === null || value === undefined) return true;
+        if (value === '') return true;
+        return Number.isNaN(Number(value));
+      }
       return String(value ?? '').trim() === '';
     });
-    if (hasMissingRequired) {
+    if (missingField) {
       setShowValidation(true);
       showToast({ message: 'Vui lòng điền đầy đủ các trường bắt buộc.', type: 'error' });
+      const element = fieldRefs.current[missingField.key];
+      if (element) {
+        element.focus();
+      }
       return;
     }
     try {
@@ -144,6 +207,7 @@ const MasterDataPage = () => {
       setEditingId(null);
       setIsFormOpen(false);
       setShowValidation(false);
+      fieldRefs.current = {};
     } catch (error) {
       showToast({ message: (error as Error).message || 'Không thể lưu bản ghi.', type: 'error' });
     }
@@ -186,6 +250,22 @@ const MasterDataPage = () => {
   }, [data, config.fields, filters]);
 
   const clearFilters = () => setFilters(createEmptyFilters(config.fields));
+
+  const registerFieldRef = (key: string, element: FieldElement | null) => {
+    if (element) {
+      fieldRefs.current[key] = element;
+    } else {
+      delete fieldRefs.current[key];
+    }
+  };
+
+  const referenceData = useMemo(
+    () => ({
+      provinces: provincesQuery.data ?? [],
+      cost_types: costTypesQuery.data ?? [],
+    }),
+    [provincesQuery.data, costTypesQuery.data],
+  );
 
   const handleBulkImport = async () => {
     const rows = bulkText
@@ -308,6 +388,8 @@ const MasterDataPage = () => {
                   record={formData}
                   onChange={handleFormChange}
                   showValidation={showValidation}
+                  registerFieldRef={registerFieldRef}
+                  referenceData={referenceData}
                 />
                 <div className="flex justify-end gap-3">
                   <button
@@ -317,6 +399,7 @@ const MasterDataPage = () => {
                       setEditingId(null);
                       setFormData(createEmptyRecord(config.fields));
                       setShowValidation(false);
+                      fieldRefs.current = {};
                     }}
                     className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-primary-300 hover:text-primary-600"
                   >
@@ -325,15 +408,16 @@ const MasterDataPage = () => {
                   {editingId ? (
                     <button
                       type="button"
-                      onClick={() => {
-                        setEditingId(null);
-                        setFormData(createEmptyRecord(config.fields));
-                        setShowValidation(false);
-                      }}
-                      className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-primary-300 hover:text-primary-600"
-                    >
-                      Huỷ chỉnh sửa
-                    </button>
+                    onClick={() => {
+                      setEditingId(null);
+                      setFormData(createEmptyRecord(config.fields));
+                      setShowValidation(false);
+                      fieldRefs.current = {};
+                    }}
+                    className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-primary-300 hover:text-primary-600"
+                  >
+                    Huỷ chỉnh sửa
+                  </button>
                   ) : null}
                   <button
                     type="submit"
