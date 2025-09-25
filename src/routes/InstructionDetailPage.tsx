@@ -35,7 +35,14 @@ const InstructionDetailPage = () => {
 
   const currentInstruction = draftInstruction ?? instruction ?? null;
 
-  const composedPrompt = useMemo(() => composePrompt(instruction, rules), [instruction, rules]);
+  const composedPrompt = useMemo(() => {
+    if (!currentInstruction) return '';
+    const instructionList = [currentInstruction];
+    const ruleMap = currentInstruction.id
+      ? { [currentInstruction.id]: rules ?? [] }
+      : {};
+    return composePrompt(instructionList, ruleMap);
+  }, [currentInstruction, rules]);
 
   const statusLabel: Record<Instruction['status'], string> = {
     draft: 'Nháp',

@@ -31,14 +31,25 @@ export const useSchema = (id?: string) =>
     },
   });
 
+const fetchActiveSchemas = async () => {
+  const docs = await listDocuments<PromptSchema>(COLLECTION, 'updatedAt');
+  const actives = docs.filter((item) => item.status === 'active');
+  return actives.map((schema) => mapSchema(schema as PromptSchema & { id: string }));
+};
+
 export const useActiveSchema = () =>
   useQuery({
     queryKey: queryKeys.activeSchema,
     queryFn: async () => {
-      const docs = await listDocuments<PromptSchema>(COLLECTION, 'updatedAt');
-      const active = docs.find((item) => item.status === 'active');
-      return active ? mapSchema(active as PromptSchema & { id: string }) : null;
+      const actives = await fetchActiveSchemas();
+      return actives[0] ?? null;
     },
+  });
+
+export const useActiveSchemas = () =>
+  useQuery({
+    queryKey: queryKeys.activeSchemas,
+    queryFn: fetchActiveSchemas,
   });
 
 export const useSchemaMutations = () => {
@@ -46,7 +57,11 @@ export const useSchemaMutations = () => {
 
   const createSchema = useMutation({
     mutationFn: (payload: PromptSchema) => addDocument(COLLECTION, payload),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.schemas }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.schemas });
+      queryClient.invalidateQueries({ queryKey: queryKeys.activeSchema });
+      queryClient.invalidateQueries({ queryKey: queryKeys.activeSchemas });
+    },
   });
 
   const updateSchema = useMutation({
@@ -55,6 +70,7 @@ export const useSchemaMutations = () => {
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.schemas });
       queryClient.invalidateQueries({ queryKey: queryKeys.activeSchema });
+      queryClient.invalidateQueries({ queryKey: queryKeys.activeSchemas });
       queryClient.invalidateQueries({ queryKey: ['schema', id] });
     },
   });

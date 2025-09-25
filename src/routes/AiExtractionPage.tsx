@@ -5,8 +5,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/common/C
 import { queryKeys } from '../constants/queryKeys';
 import { fetchLatestPrompt, requestAiExtraction } from '../features/ai/api';
 import { createAjvInstance, formatAjvErrors } from '../lib/ajv';
-import { useActiveSchema } from '../features/schemas/hooks/useSchemas';
-import { useActiveInstruction, useInstructionRules } from '../features/instructions/hooks/useInstructions';
+import { useActiveSchemas } from '../features/schemas/hooks/useSchemas';
+import {
+  useActiveInstructions,
+  useInstructionRuleSets,
+} from '../features/instructions/hooks/useInstructions';
 import { composePrompt } from '../features/instructions/utils/composePrompt';
 import { LoadingState } from '../components/common/LoadingState';
 import { ErrorState } from '../components/common/ErrorState';
@@ -20,21 +23,29 @@ const AiExtractionPage = () => {
   const navigate = useNavigate();
   const { setDraft } = useTourDraft();
   const { showToast } = useToast();
-  const { data: schema, isLoading: loadingSchema, isError: schemaError } = useActiveSchema();
+  const {
+    data: activeSchemas,
+    isLoading: loadingSchemas,
+    isError: schemaError,
+  } = useActiveSchemas();
   const { data: promptData, isLoading: loadingPrompt, isError: promptError } = useQuery({
     queryKey: queryKeys.aiPrompt,
     queryFn: fetchLatestPrompt,
   });
   const {
-    data: activeInstruction,
-    isLoading: loadingActiveInstruction,
-    isError: activeInstructionError,
-  } = useActiveInstruction();
+    data: activeInstructions,
+    isLoading: loadingActiveInstructions,
+    isError: activeInstructionsError,
+  } = useActiveInstructions();
+  const activeInstructionIds = useMemo(
+    () => (activeInstructions ?? []).map((instruction) => instruction.id).filter(Boolean) as string[],
+    [activeInstructions],
+  );
   const {
-    data: activeRules,
+    data: activeRuleSets,
     isLoading: loadingActiveRules,
     isError: activeRulesError,
-  } = useInstructionRules(activeInstruction?.id);
+  } = useInstructionRuleSets(activeInstructionIds);
 
   const [imageUrl, setImageUrl] = useState('');
   const [overrides, setOverrides] = useState('');
@@ -45,10 +56,54 @@ const AiExtractionPage = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
 
-  const schemaObject = useMemo(() => {
-    if (!schema?.json_schema) return null;
-    return typeof schema.json_schema === 'string' ? JSON.parse(schema.json_schema) : schema.json_schema;
-  }, [schema]);
+  const { parsedSchemas, schemaParseError } = useMemo(() => {
+    const result: {
+      parsedSchemas: { id: string; name: string; version: number; data: unknown }[];
+      schemaParseError: string | null;
+    } = { parsedSchemas: [], schemaParseError: null };
+
+    if (!activeSchemas) return result;
+
+    for (const schema of activeSchemas) {
+      if (!schema.json_schema) continue;
+      try {
+        const data =
+          typeof schema.json_schema === 'string'
+            ? JSON.parse(schema.json_schema)
+            : schema.json_schema;
+        result.parsedSchemas.push({
+          id: schema.id ?? schema.name,
+          name: schema.name,
+          version: schema.version,
+          data,
+        });
+      } catch (error) {
+        result.schemaParseError = `Không thể parse schema ${schema.name}: ${(error as Error).message}`;
+        break;
+      }
+    }
+
+    return result;
+  }, [activeSchemas]);
+
+  const validationSchema = useMemo(() => {
+    const schemaEntry = parsedSchemas.find((entry) => entry.data && typeof entry.data === 'object');
+    return schemaEntry?.data ?? null;
+  }, [parsedSchemas]);
+
+  const schemaDisplayText = useMemo(() => {
+    if (!parsedSchemas.length) return 'Chưa có schema đang dùng';
+    return parsedSchemas
+      .map((entry, index) => {
+        const header = `Schema ${index + 1}: ${entry.name} (v${entry.version})`;
+        const body =
+          entry.data !== undefined
+            ? JSON.stringify(entry.data, null, 2)
+            : 'Không có nội dung schema';
+        return `${header}\n${body}`;
+      })
+      .join('\n\n---\n\n');
+  }, [parsedSchemas]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -69,9 +124,9 @@ const AiExtractionPage = () => {
       setParsedJson(parsed);
       showToast({ message: 'Đã gọi Gemini thành công.', type: 'success' });
 
-      if (schemaObject) {
+      if (validationSchema) {
         const ajv = createAjvInstance();
-        const validate = ajv.compile(schemaObject);
+        const validate = ajv.compile(validationSchema as Record<string, unknown>);
         const isValid = validate(parsed);
         if (isValid) {
           setValidationResult('✅ JSON hợp lệ theo schema');
@@ -97,25 +152,33 @@ const AiExtractionPage = () => {
     navigate('/tours/new');
   };
 
-  const shouldUseFallbackPrompt = !(promptData?.prompt && promptData.prompt.trim().length > 0);
-  const fallbackPrompt = useMemo(
-    () => composePrompt(activeInstruction, activeRules),
-    [activeInstruction, activeRules],
+  const composedPrompt = useMemo(
+    () => composePrompt(activeInstructions, activeRuleSets ?? {}),
+    [activeInstructions, activeRuleSets],
   );
-  const promptText = shouldUseFallbackPrompt
-    ? fallbackPrompt
-    : promptData?.prompt ?? fallbackPrompt;
+  const promptText = useMemo(() => {
+    const sections = [promptData?.prompt, composedPrompt]
+      .map((section) => section?.trim())
+      .filter((section): section is string => Boolean(section && section.length > 0));
+    return sections.join('\n\n---\n\n');
+  }, [composedPrompt, promptData?.prompt]);
 
-  if (loadingSchema || loadingPrompt || (shouldUseFallbackPrompt && (loadingActiveInstruction || loadingActiveRules))) {
+  if (loadingSchemas || loadingPrompt || loadingActiveInstructions || loadingActiveRules) {
     return <LoadingState label="Đang tải cấu hình AI..." />;
   }
 
   if (
     schemaError ||
+    schemaParseError ||
     promptError ||
-    (shouldUseFallbackPrompt && (activeInstructionError || activeRulesError))
+    activeInstructionsError ||
+    activeRulesError
   ) {
-    return <ErrorState message="Không thể tải thông tin schema hoặc prompt." />;
+    return (
+      <ErrorState
+        message={schemaParseError ?? 'Không thể tải thông tin schema hoặc prompt.'}
+      />
+    );
   }
 
   return (
@@ -215,7 +278,7 @@ const AiExtractionPage = () => {
               <textarea
                 readOnly
                 rows={12}
-                value={schemaObject ? JSON.stringify(schemaObject, null, 2) : 'Chưa có schema đang dùng'}
+                value={schemaDisplayText}
                 className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 font-mono overflow-x-auto"
               />
             </div>
