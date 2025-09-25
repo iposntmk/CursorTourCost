@@ -181,6 +181,7 @@ const AiExtractionPage = () => {
         imageBase64: base64Data,
         imageMimeType: uploadedFile.type,
         imageName: uploadedFile.name,
+        prompt: promptText,
         overrides: overridesPayload,
       });
       setRawOutput(JSON.stringify(response.raw_output ?? response, null, 2));

@@ -71,6 +71,7 @@ export const requestAiExtraction = async (body: {
   imageBase64?: string;
   imageMimeType?: string;
   imageName?: string;
+  prompt?: string;
   overrides?: Record<string, unknown>;
 }) => {
   const res = await fetch(`${BASE_URL}/ai/extract`, {
