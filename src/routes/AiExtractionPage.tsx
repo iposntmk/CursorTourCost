@@ -49,6 +49,35 @@ const AiExtractionPage = () => {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
   const [overrides, setOverrides] = useState('');
+  const [customPrompt, setCustomPrompt] = useState('');
+  const [desiredJsonFormat, setDesiredJsonFormat] = useState(`{
+  "thong_tin_chung": {
+    "ma_tour": "(Tour Code)",
+    "ten_cong_ty": "",
+    "ten_guide": "(Guide Name)",
+    "ten_khach": "",
+    "quoc_tich_khach": "(Nationality)",
+    "so_luong_khach": 0,
+    "ten_lai_xe": "",
+    "so_dien_thoai_khach": ""
+  },
+  "ngay_bat_dau": "(Start Date)",
+  "ngay_ket_thuc": "(End Date)",
+  "tong_so_ngay_tour": 0,
+  "danh_sach_ngay_tham_quan": [],
+  "danh_sach_dia_diem": [],
+  "danh_sach_chi_phi": [],
+  "an": {
+    "an_trua": [],
+    "an_toi": []
+  },
+  "khach_san": [],
+  "tip": {
+    "co_tip": false,
+    "so_tien_tip": 0
+  },
+  "ghi_chu": ""
+}`);
   const [rawOutput, setRawOutput] = useState('');
   const [parsedJson, setParsedJson] = useState<unknown>(null);
   const [validationResult, setValidationResult] = useState<string | null>(null);
@@ -181,7 +210,7 @@ const AiExtractionPage = () => {
         imageBase64: base64Data,
         imageMimeType: uploadedFile.type,
         imageName: uploadedFile.name,
-        prompt: promptText,
+        prompt: finalPromptText,
         overrides: overridesPayload,
       });
       setRawOutput(JSON.stringify(response.raw_output ?? response, null, 2));
@@ -221,12 +250,20 @@ const AiExtractionPage = () => {
     () => composePrompt(activeInstructions, activeRuleSets ?? {}),
     [activeInstructions, activeRuleSets],
   );
-  const promptText = useMemo(() => {
-    const sections = [promptData?.prompt, composedPrompt]
+  
+  const finalPromptText = useMemo(() => {
+    // Use custom prompt if provided, otherwise use composed prompt
+    const basePrompt = customPrompt.trim() || composedPrompt;
+    
+    // Add desired JSON format instruction
+    const jsonFormatInstruction = `\n\nIMPORTANT: Please return the extracted data in the following JSON format:\n\`\`\`json\n${desiredJsonFormat}\n\`\`\`\n\nMake sure to fill in the actual values and replace placeholders like "(Tour Code)", "(Guide Name)", etc. with the real data from the image.`;
+    
+    const sections = [promptData?.prompt, basePrompt]
       .map((section) => section?.trim())
       .filter((section): section is string => Boolean(section && section.length > 0));
-    return sections.join('\n\n---\n\n');
-  }, [composedPrompt, promptData?.prompt]);
+    
+    return sections.join('\n\n---\n\n') + jsonFormatInstruction;
+  }, [customPrompt, composedPrompt, promptData?.prompt, desiredJsonFormat]);
 
   if (loadingSchemas || loadingPrompt || loadingActiveInstructions || loadingActiveRules) {
     return <LoadingState label="Đang tải cấu hình AI..." />;
@@ -299,6 +336,36 @@ const AiExtractionPage = () => {
                 </div>
               ) : null}
             </div>
+            
+            {/* Custom Prompt */}
+            <div>
+              <label className="text-sm font-medium text-slate-700">Prompt tùy chỉnh</label>
+              <p className="mt-1 text-xs text-slate-500">
+                Nhập prompt tùy chỉnh để hướng dẫn Gemini trích xuất thông tin. Để trống để sử dụng prompt mặc định từ hệ thống.
+              </p>
+              <textarea
+                rows={6}
+                value={customPrompt}
+                onChange={(event) => setCustomPrompt(event.target.value)}
+                placeholder="Ví dụ: Hãy trích xuất thông tin tour từ hình ảnh này, bao gồm mã tour, tên guide, ngày bắt đầu và kết thúc..."
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary-400 focus:ring-0"
+              />
+            </div>
+
+            {/* Desired JSON Format */}
+            <div>
+              <label className="text-sm font-medium text-slate-700">Định dạng JSON mong muốn</label>
+              <p className="mt-1 text-xs text-slate-500">
+                Định nghĩa cấu trúc JSON mà bạn muốn Gemini trả về. Sử dụng placeholder như "(Tour Code)", "(Guide Name)" để chỉ định vị trí cần điền.
+              </p>
+              <textarea
+                rows={12}
+                value={desiredJsonFormat}
+                onChange={(event) => setDesiredJsonFormat(event.target.value)}
+                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono focus:border-primary-400 focus:ring-0"
+              />
+            </div>
+
             <div>
               <label className="text-sm font-medium text-slate-700">Ghi đè (JSON tuỳ chọn)</label>
               <p className="mt-1 text-xs text-slate-500">
@@ -319,6 +386,35 @@ const AiExtractionPage = () => {
                   setUploadedFile(null);
                   setFilePreviewUrl(null);
                   setOverrides('');
+                  setCustomPrompt('');
+                  setDesiredJsonFormat(`{
+  "thong_tin_chung": {
+    "ma_tour": "(Tour Code)",
+    "ten_cong_ty": "",
+    "ten_guide": "(Guide Name)",
+    "ten_khach": "",
+    "quoc_tich_khach": "(Nationality)",
+    "so_luong_khach": 0,
+    "ten_lai_xe": "",
+    "so_dien_thoai_khach": ""
+  },
+  "ngay_bat_dau": "(Start Date)",
+  "ngay_ket_thuc": "(End Date)",
+  "tong_so_ngay_tour": 0,
+  "danh_sach_ngay_tham_quan": [],
+  "danh_sach_dia_diem": [],
+  "danh_sach_chi_phi": [],
+  "an": {
+    "an_trua": [],
+    "an_toi": []
+  },
+  "khach_san": [],
+  "tip": {
+    "co_tip": false,
+    "so_tien_tip": 0
+  },
+  "ghi_chu": ""
+}`);
                   setRawOutput('');
                   setParsedJson(null);
                   setValidationErrors([]);
@@ -353,11 +449,11 @@ const AiExtractionPage = () => {
         <CardContent>
           <div className="grid gap-4 md:grid-cols-2">
             <div>
-              <p className="text-sm font-semibold text-slate-700">Prompt</p>
+              <p className="text-sm font-semibold text-slate-700">Prompt cuối cùng</p>
               <textarea
                 readOnly
                 rows={12}
-                value={promptText}
+                value={finalPromptText}
                 className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 font-mono overflow-x-auto"
               />
             </div>
