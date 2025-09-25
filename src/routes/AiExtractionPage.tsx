@@ -12,6 +12,7 @@ import { normalizeAiTour } from '../features/ai/utils';
 import { useTourDraft } from '../hooks/useTourDraft';
 import { TourData } from '../types/tour';
 import { useToast } from '../hooks/useToast';
+import clsx from 'clsx';
 
 const AiExtractionPage = () => {
   const navigate = useNavigate();
@@ -30,6 +31,7 @@ const AiExtractionPage = () => {
   const [validationResult, setValidationResult] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [showValidation, setShowValidation] = useState(false);
 
   const schemaObject = useMemo(() => {
     if (!schema?.json_schema) return null;
@@ -41,6 +43,12 @@ const AiExtractionPage = () => {
     setIsLoading(true);
     setValidationResult(null);
     setValidationErrors([]);
+    if (!imageUrl.trim()) {
+      setShowValidation(true);
+      showToast({ message: 'Vui lòng nhập link ảnh chương trình tour.', type: 'error' });
+      setIsLoading(false);
+      return;
+    }
     try {
       const overridesPayload = overrides ? JSON.parse(overrides) : undefined;
       const response = await requestAiExtraction({ imageUrl, overrides: overridesPayload });
@@ -96,20 +104,31 @@ const AiExtractionPage = () => {
             </div>
           </CardTitle>
         </CardHeader>
-        <CardContent>
+          <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="text-sm font-medium text-slate-700">Link ảnh chương trình tour</label>
+              <p className="mt-1 text-xs text-slate-500">
+                Dán đường dẫn trực tiếp tới ảnh hoặc file PDF chứa lịch trình để hệ thống gửi tới Gemini xử lý.
+              </p>
               <input
-                required
                 value={imageUrl}
                 onChange={(event) => setImageUrl(event.target.value)}
                 placeholder="https://..."
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary-400 focus:ring-0"
+                onBlur={() => setShowValidation(true)}
+                className={clsx(
+                  'mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:ring-0',
+                  showValidation && !imageUrl.trim()
+                    ? 'border-red-300 focus:border-red-400 focus:ring-red-100 bg-red-50/40'
+                    : 'border-slate-200 focus:border-primary-400',
+                )}
               />
             </div>
             <div>
               <label className="text-sm font-medium text-slate-700">Ghi đè (JSON tuỳ chọn)</label>
+              <p className="mt-1 text-xs text-slate-500">
+                Cung cấp JSON để ghi đè thông tin mặc định khi gọi Gemini (ví dụ instructionId, schema...).
+              </p>
               <textarea
                 rows={4}
                 value={overrides}
@@ -128,6 +147,7 @@ const AiExtractionPage = () => {
                   setParsedJson(null);
                   setValidationErrors([]);
                   setValidationResult(null);
+                  setShowValidation(false);
                 }}
                 className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-primary-300 hover:text-primary-600"
               >

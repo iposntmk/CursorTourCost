@@ -3,7 +3,7 @@ import { getAnalytics, isSupported as isAnalyticsSupported } from 'firebase/anal
 import { connectFirestoreEmulator, getFirestore } from 'firebase/firestore';
 import { connectFunctionsEmulator, getFunctions } from 'firebase/functions';
 
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: 'AIzaSyBUUPig4WhKaiQSqv-3TUDUsPK1sDFUQVc',
   authDomain: 'quantum-ratio-468010-d4.firebaseapp.com',
   projectId: 'quantum-ratio-468010-d4',
@@ -17,6 +17,9 @@ export const app = initializeApp(firebaseConfig);
 
 export const db = getFirestore(app);
 export const functions = getFunctions(app);
+
+export const getFirebaseConsoleUrl = (section: string = 'overview') =>
+  `https://console.firebase.google.com/u/0/project/${firebaseConfig.projectId}/${section}`;
 
 if (import.meta.env.DEV && typeof window !== 'undefined') {
   const useEmulators = import.meta.env.VITE_USE_FIREBASE_EMULATORS === 'true';

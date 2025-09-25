@@ -17,6 +17,7 @@ const SchemaEditorPage = () => {
   const [validationResult, setValidationResult] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const [filters, setFilters] = useState({ name: '', version: '', status: '', updatedAt: '' });
   const { showToast } = useToast();
 
   const statusLabel = useMemo<Record<SchemaStatus, string>>(
@@ -41,6 +42,21 @@ const SchemaEditorPage = () => {
     setValidationResult(null);
     setValidationErrors([]);
   };
+
+  const filteredSchemas = useMemo(() => {
+    if (!data) return [];
+    return data.filter((schema) => {
+      const matchesName = schema.name.toLowerCase().includes(filters.name.toLowerCase());
+      const matchesVersion = filters.version
+        ? String(schema.version).toLowerCase().includes(filters.version.toLowerCase())
+        : true;
+      const matchesStatus = filters.status ? schema.status === filters.status : true;
+      const matchesUpdated = filters.updatedAt
+        ? (schema.updatedAt ?? '').toLowerCase().includes(filters.updatedAt.toLowerCase())
+        : true;
+      return matchesName && matchesVersion && matchesStatus && matchesUpdated;
+    });
+  }, [data, filters]);
 
   const handleCreateSchema = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -106,6 +122,24 @@ const SchemaEditorPage = () => {
     }
   };
 
+  const handleDuplicate = async (schema: PromptSchema) => {
+    const payload: PromptSchema = { ...schema };
+    delete payload.id;
+    delete payload.updatedAt;
+    try {
+      await createSchema.mutateAsync({
+        ...payload,
+        name: `${schema.name} (bản sao)`,
+        status: 'draft',
+      });
+      showToast({ message: `Đã nhân bản ${schema.name}.`, type: 'success' });
+    } catch (error) {
+      showToast({ message: (error as Error).message || 'Không thể nhân bản schema.', type: 'error' });
+    }
+  };
+
+  const clearFilters = () => setFilters({ name: '', version: '', status: '', updatedAt: '' });
+
   if (isLoading) return <LoadingState label="Đang tải danh sách schema..." />;
   if (isError) return <ErrorState message="Không thể tải danh sách schema." />;
 
@@ -143,12 +177,63 @@ const SchemaEditorPage = () => {
                     <th className="px-4 py-3">Phiên bản</th>
                     <th className="px-4 py-3">Trạng thái</th>
                     <th className="px-4 py-3">Cập nhật</th>
-                    <th className="px-4 py-3" />
+                    <th className="px-4 py-3 text-right">Actions</th>
+                  </tr>
+                  <tr className="bg-white text-xs text-slate-500">
+                    <th className="px-4 py-2">
+                      <input
+                        value={filters.name}
+                        onChange={(event) => setFilters((prev) => ({ ...prev, name: event.target.value }))}
+                        placeholder="Lọc tên"
+                        className="w-full rounded-md border border-slate-200 px-2 py-1"
+                      />
+                    </th>
+                    <th className="px-4 py-2">
+                      <input
+                        value={filters.version}
+                        onChange={(event) => setFilters((prev) => ({ ...prev, version: event.target.value }))}
+                        placeholder="v..."
+                        className="w-full rounded-md border border-slate-200 px-2 py-1"
+                      />
+                    </th>
+                    <th className="px-4 py-2">
+                      <select
+                        value={filters.status}
+                        onChange={(event) => setFilters((prev) => ({ ...prev, status: event.target.value }))}
+                        className="w-full rounded-md border border-slate-200 px-2 py-1"
+                      >
+                        <option value="">Tất cả</option>
+                        <option value="draft">Nháp</option>
+                        <option value="active">Đang dùng</option>
+                        <option value="archived">Lưu trữ</option>
+                      </select>
+                    </th>
+                    <th className="px-4 py-2">
+                      <input
+                        value={filters.updatedAt}
+                        onChange={(event) => setFilters((prev) => ({ ...prev, updatedAt: event.target.value }))}
+                        placeholder="2024-..."
+                        className="w-full rounded-md border border-slate-200 px-2 py-1"
+                      />
+                    </th>
+                    <th className="px-4 py-2 text-right">
+                      <button
+                        type="button"
+                        onClick={clearFilters}
+                        className="inline-flex items-center justify-center rounded-md border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-600 hover:border-primary-300 hover:text-primary-600"
+                      >
+                        Xoá lọc
+                      </button>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
-                  {data.map((schema) => (
-                    <tr key={schema.id} className="hover:bg-slate-50/80">
+                  {filteredSchemas.map((schema) => (
+                    <tr
+                      key={schema.id}
+                      className="hover:bg-primary-50/70 cursor-pointer"
+                      onClick={() => handleSelectSchema(schema)}
+                    >
                       <td className="px-4 py-3 font-semibold text-slate-900">{schema.name}</td>
                       <td className="px-4 py-3 text-slate-600">v{schema.version}</td>
                       <td className="px-4 py-3">
@@ -163,14 +248,28 @@ const SchemaEditorPage = () => {
                         </span>
                       </td>
                       <td className="px-4 py-3 text-slate-500">{schema.updatedAt?.substring(0, 10) ?? '—'}</td>
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-3 text-right" onClick={(event) => event.stopPropagation()}>
                         <div className="flex justify-end gap-2">
                           <button
                             type="button"
                             onClick={() => handleSelectSchema(schema)}
                             className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-primary-300 hover:text-primary-600"
                           >
+                            Xem
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleSelectSchema(schema)}
+                            className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-primary-300 hover:text-primary-600"
+                          >
                             Chỉnh sửa
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDuplicate(schema)}
+                            className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-primary-300 hover:text-primary-600"
+                          >
+                            Nhân bản
                           </button>
                           {schema.status !== 'active' ? (
                             <button
