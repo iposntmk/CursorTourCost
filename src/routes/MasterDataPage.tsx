@@ -1,4 +1,4 @@
-import { ChangeEvent, FormEvent, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import Papa from 'papaparse';
 import { saveAs } from 'file-saver';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/common/Card';
@@ -9,6 +9,7 @@ import { useToast } from '../hooks/useToast';
 import { LoadingState } from '../components/common/LoadingState';
 import { ErrorState } from '../components/common/ErrorState';
 import { EmptyState } from '../components/common/EmptyState';
+import clsx from 'clsx';
 
 const createEmptyRecord = (fields: MasterDataField[]): MasterDataRecord => {
   const base: MasterDataRecord = { name: '' };
@@ -19,19 +20,34 @@ const createEmptyRecord = (fields: MasterDataField[]): MasterDataRecord => {
   return base;
 };
 
+const createEmptyFilters = (fields: MasterDataField[]) => {
+  const filters: Record<string, string> = {};
+  fields.forEach((field) => {
+    filters[field.key] = '';
+  });
+  return filters;
+};
+
 const MasterDataForm = ({
   type,
   record,
   onChange,
+  showValidation,
 }: {
   type: MasterDataType;
   record: MasterDataRecord;
   onChange: (key: string, value: string | number) => void;
+  showValidation: boolean;
 }) => {
   const renderField = (field: MasterDataField) => {
     const value = (record as Record<string, unknown>)[field.key] ?? '';
     const commonProps = {
-      className: 'mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary-400 focus:ring-0',
+      className: clsx(
+        'mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:ring-0',
+        showValidation && !field.optional && String(value ?? '').trim() === ''
+          ? 'border-red-300 focus:border-red-400 focus:ring-red-100 bg-red-50/40'
+          : 'border-slate-200 focus:border-primary-400',
+      ),
       value: value as string | number,
       onChange: (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
         onChange(field.key, field.type === 'number' ? Number(event.target.value || 0) : event.target.value),
@@ -53,7 +69,10 @@ const MasterDataForm = ({
     <div className="grid gap-4 md:grid-cols-2">
       {MASTER_DATA_CONFIGS[type].fields.map((field) => (
         <div key={field.key} className={field.type === 'textarea' ? 'md:col-span-2' : ''}>
-          <label className="text-sm font-medium text-slate-700">{field.label}</label>
+          <label className="text-sm font-medium text-slate-700">
+            {field.label}
+            {!field.optional ? <span className="text-red-500"> *</span> : null}
+          </label>
           {renderField(field)}
           {field.helperText ? <p className="mt-1 text-xs text-slate-500">{field.helperText}</p> : null}
         </div>
@@ -67,6 +86,11 @@ const MasterDataPage = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<MasterDataRecord>(() => createEmptyRecord(MASTER_DATA_CONFIGS['guides'].fields));
   const [bulkText, setBulkText] = useState('');
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [showValidation, setShowValidation] = useState(false);
+  const [filters, setFilters] = useState<Record<string, string>>(() =>
+    createEmptyFilters(MASTER_DATA_CONFIGS['guides'].fields),
+  );
 
   const { data, isLoading, isError } = useMasterData(selectedType);
   const { create, update, remove } = useMasterDataMutations(selectedType);
@@ -74,11 +98,17 @@ const MasterDataPage = () => {
 
   const config = MASTER_DATA_CONFIGS[selectedType];
 
+  useEffect(() => {
+    setFilters(createEmptyFilters(config.fields));
+  }, [config]);
+
   const handleSelectType = (type: MasterDataType) => {
     setSelectedType(type);
     setEditingId(null);
     setFormData(createEmptyRecord(MASTER_DATA_CONFIGS[type].fields));
     setBulkText('');
+    setIsFormOpen(false);
+    setShowValidation(false);
   };
 
   const handleFormChange = (key: string, value: string | number) => {
@@ -91,6 +121,17 @@ const MasterDataPage = () => {
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const payload = { ...formData };
+    const hasMissingRequired = config.fields.some((field) => {
+      if (field.optional) return false;
+      const value = (payload as Record<string, unknown>)[field.key];
+      if (field.type === 'number') return value === null || value === undefined || Number.isNaN(value as number);
+      return String(value ?? '').trim() === '';
+    });
+    if (hasMissingRequired) {
+      setShowValidation(true);
+      showToast({ message: 'Vui lòng điền đầy đủ các trường bắt buộc.', type: 'error' });
+      return;
+    }
     try {
       if (editingId) {
         await update.mutateAsync({ id: editingId, data: payload });
@@ -101,6 +142,8 @@ const MasterDataPage = () => {
       }
       setFormData(createEmptyRecord(config.fields));
       setEditingId(null);
+      setIsFormOpen(false);
+      setShowValidation(false);
     } catch (error) {
       showToast({ message: (error as Error).message || 'Không thể lưu bản ghi.', type: 'error' });
     }
@@ -109,6 +152,8 @@ const MasterDataPage = () => {
   const handleEdit = (record: MasterDataRecord) => {
     setEditingId(record.id ?? null);
     setFormData(record);
+    setIsFormOpen(true);
+    setShowValidation(false);
   };
 
   const handleDelete = async (id: string) => {
@@ -116,6 +161,31 @@ const MasterDataPage = () => {
     await remove.mutateAsync(id);
     showToast({ message: 'Đã xoá bản ghi.', type: 'info' });
   };
+
+  const handleDuplicate = async (record: MasterDataRecord) => {
+    const rest: MasterDataRecord = { ...record };
+    delete rest.id;
+    try {
+      await create.mutateAsync({ ...rest, name: `${record.name} (bản sao)` });
+      showToast({ message: 'Đã nhân bản bản ghi.', type: 'success' });
+    } catch (error) {
+      showToast({ message: (error as Error).message || 'Không thể nhân bản bản ghi.', type: 'error' });
+    }
+  };
+
+  const filteredData = useMemo(() => {
+    if (!data) return [];
+    return data.filter((record) =>
+      config.fields.every((field) => {
+        const filterValue = filters[field.key]?.toLowerCase() ?? '';
+        if (!filterValue) return true;
+        const value = String((record as Record<string, unknown>)[field.key] ?? '').toLowerCase();
+        return value.includes(filterValue);
+      }),
+    );
+  }, [data, config.fields, filters]);
+
+  const clearFilters = () => setFilters(createEmptyFilters(config.fields));
 
   const handleBulkImport = async () => {
     const rows = bulkText
@@ -214,52 +284,90 @@ const MasterDataPage = () => {
               Nhập CSV
               <input type="file" accept=".csv" className="hidden" onChange={handleCsvImport} />
             </label>
+            {!isFormOpen ? (
+              <button
+                type="button"
+                onClick={() => setIsFormOpen(true)}
+                className="inline-flex items-center justify-center rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-500"
+              >
+                Thêm bản ghi mới
+              </button>
+            ) : null}
           </div>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <MasterDataForm type={selectedType} record={formData} onChange={handleFormChange} />
-            <div className="flex justify-end gap-3">
-              {editingId ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setEditingId(null);
-                    setFormData(createEmptyRecord(config.fields));
-                  }}
-                  className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-primary-300 hover:text-primary-600"
-                >
-                  Huỷ
-                </button>
-              ) : null}
-              <button
-                type="submit"
-                className="inline-flex items-center justify-center rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-500"
-              >
-                {editingId ? 'Cập nhật' : 'Thêm mới'}
-              </button>
-            </div>
-          </form>
+          {!isFormOpen ? (
+            <p className="text-sm text-slate-600">
+              Nhấn nút “Thêm bản ghi mới” để mở biểu mẫu với mô tả chi tiết từng trường dữ liệu chuẩn.
+            </p>
+          ) : (
+            <>
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <MasterDataForm
+                  type={selectedType}
+                  record={formData}
+                  onChange={handleFormChange}
+                  showValidation={showValidation}
+                />
+                <div className="flex justify-end gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsFormOpen(false);
+                      setEditingId(null);
+                      setFormData(createEmptyRecord(config.fields));
+                      setShowValidation(false);
+                    }}
+                    className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-primary-300 hover:text-primary-600"
+                  >
+                    Đóng
+                  </button>
+                  {editingId ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingId(null);
+                        setFormData(createEmptyRecord(config.fields));
+                        setShowValidation(false);
+                      }}
+                      className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-primary-300 hover:text-primary-600"
+                    >
+                      Huỷ chỉnh sửa
+                    </button>
+                  ) : null}
+                  <button
+                    type="submit"
+                    className="inline-flex items-center justify-center rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-500"
+                  >
+                    {editingId ? 'Cập nhật' : 'Thêm mới'}
+                  </button>
+                </div>
+              </form>
 
-          <div className="mt-6">
-            <label className="text-sm font-medium text-slate-700">Import nhanh (mỗi dòng: giá trị | giá trị...)</label>
-            <textarea
-              rows={4}
-              value={bulkText}
-              onChange={(event) => setBulkText(event.target.value)}
-              placeholder={config.bulkPlaceholder}
-              className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm"
-            />
-            <div className="mt-2 flex justify-end">
-              <button
-                type="button"
-                onClick={handleBulkImport}
-                className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-primary-300 hover:text-primary-600"
-              >
-                Nhập hàng loạt
-              </button>
-            </div>
-          </div>
+              <div className="mt-6">
+                <label className="text-sm font-medium text-slate-700">Import nhanh (mỗi dòng: giá trị | giá trị...)</label>
+                <p className="mt-1 text-xs text-slate-500">
+                  Sử dụng định dạng mẫu để nhập hàng loạt bản ghi, phù hợp cho việc chuẩn hoá dữ liệu nhanh chóng.
+                </p>
+                <textarea
+                  rows={4}
+                  value={bulkText}
+                  onChange={(event) => setBulkText(event.target.value)}
+                  placeholder={config.bulkPlaceholder}
+                  className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm"
+                />
+                <div className="mt-2 flex justify-end">
+                  <button
+                    type="button"
+                    onClick={handleBulkImport}
+                    className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-primary-300 hover:text-primary-600"
+                  >
+                    Nhập hàng loạt
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
@@ -285,18 +393,48 @@ const MasterDataPage = () => {
                         {field.label}
                       </th>
                     ))}
-                    <th className="px-4 py-3 text-right">Hành động</th>
+                    <th className="px-4 py-3 text-right">Actions</th>
+                  </tr>
+                  <tr className="bg-white text-xs text-slate-500">
+                    {config.fields.map((field) => (
+                      <th key={field.key} className="px-4 py-2">
+                        <input
+                          value={filters[field.key] ?? ''}
+                          onChange={(event) =>
+                            setFilters((prev) => ({
+                              ...prev,
+                              [field.key]: event.target.value,
+                            }))
+                          }
+                          placeholder={`Lọc ${field.label.toLowerCase()}`}
+                          className="w-full rounded-md border border-slate-200 px-2 py-1"
+                        />
+                      </th>
+                    ))}
+                    <th className="px-4 py-2 text-right">
+                      <button
+                        type="button"
+                        onClick={clearFilters}
+                        className="inline-flex items-center justify-center rounded-md border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-600 hover:border-primary-300 hover:text-primary-600"
+                      >
+                        Xoá lọc
+                      </button>
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
-                  {data.map((record) => (
-                    <tr key={record.id} className="hover:bg-slate-50/80">
+                  {filteredData.map((record) => (
+                    <tr
+                      key={record.id ?? record.name}
+                      className="hover:bg-primary-50/70 cursor-pointer"
+                      onClick={() => handleEdit(record)}
+                    >
                       {config.fields.map((field) => (
                         <td key={field.key} className="px-4 py-3 text-slate-600">
                           {String((record as Record<string, unknown>)[field.key] ?? '')}
                         </td>
                       ))}
-                      <td className="px-4 py-3 text-right">
+                      <td className="px-4 py-3 text-right" onClick={(event) => event.stopPropagation()}>
                         <div className="flex justify-end gap-2">
                           <button
                             type="button"
@@ -304,6 +442,13 @@ const MasterDataPage = () => {
                             className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-primary-300 hover:text-primary-600"
                           >
                             Sửa
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDuplicate(record)}
+                            className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-primary-300 hover:text-primary-600"
+                          >
+                            Nhân bản
                           </button>
                           {record.id ? (
                             <button

@@ -1,9 +1,10 @@
 import { ReactNode, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { AlignJustify, X, BarChart3, BookOpen, Bot, FileSpreadsheet, Layers3, ListTree, Map, Settings2 } from 'lucide-react';
+import { AlignJustify, X, BarChart3, BookOpen, Bot, FileSpreadsheet, Layers3, ListTree, Map, Settings2, ExternalLink } from 'lucide-react';
 import clsx from 'clsx';
 import { useApiKey } from '../../hooks/useApiKey';
 import { ApiKeyDialog } from '../settings/ApiKeyDialog';
+import { firebaseConfig, getFirebaseConsoleUrl } from '../../lib/firebase';
 
 const navigation = [
   { to: '/', label: 'Tổng quan', icon: BarChart3 },
@@ -82,7 +83,18 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
             })}
           </nav>
           <div className="px-6 py-5 border-t border-slate-200 text-xs text-slate-500 space-y-1">
-            <p>Dự án Firebase: quantum-ratio-468010-d4</p>
+            <div className="flex items-center gap-2 text-slate-600">
+              <p>Dự án Firebase: {firebaseConfig.projectId}</p>
+              <a
+                href={getFirebaseConsoleUrl()}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 rounded-full border border-primary-200 px-2 py-1 text-[11px] font-semibold text-primary-600 hover:bg-primary-50"
+              >
+                Mở console
+                <ExternalLink className="h-3 w-3" />
+              </a>
+            </div>
             <p>Môi trường: {import.meta.env.MODE}</p>
             <p>API key Gemini: {apiKey ? 'đã thiết lập' : 'chưa thiết lập'}</p>
             <p className="pt-1">© {new Date().getFullYear()} Cursor Travel Internal</p>
