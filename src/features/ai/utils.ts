@@ -99,16 +99,58 @@ export const normalizeAiTour = (raw: unknown): TourData => {
   base.ngay_ket_thuc = ensureString(source.ngay_ket_thuc || source.endDate);
   base.tong_so_ngay_tour = normalizeNumber(source.tong_so_ngay_tour || source.totalDays);
 
-  base.danh_sach_ngay_tham_quan = ensureArray(source.danh_sach_ngay_tham_quan || source.itineraryDays).map((item) => ({
-    ngay: ensureString((item as Record<string, unknown>)?.ngay || (item as Record<string, unknown>)?.date),
-    tinh_thanh: ensureString((item as Record<string, unknown>)?.tinh_thanh || (item as Record<string, unknown>)?.province),
-  }));
+  // Handle danh_sach_ngay_tham_quan - can be array of strings or array of objects
+  const ngayThamQuanRaw = source.danh_sach_ngay_tham_quan || source.itineraryDays;
+  if (Array.isArray(ngayThamQuanRaw)) {
+    base.danh_sach_ngay_tham_quan = ngayThamQuanRaw.map((item) => {
+      if (typeof item === 'string') {
+        // If it's a string, create object with ngay field
+        return {
+          ngay: item,
+          tinh_thanh: '',
+        };
+      } else if (typeof item === 'object' && item !== null) {
+        // If it's an object, extract fields
+        const itemObj = item as Record<string, unknown>;
+        return {
+          ngay: ensureString(itemObj.ngay || itemObj.date),
+          tinh_thanh: ensureString(itemObj.tinh_thanh || itemObj.province),
+        };
+      }
+      return { ngay: '', tinh_thanh: '' };
+    });
+  }
 
-  base.danh_sach_dia_diem = ensureArray(source.danh_sach_dia_diem || source.attractions).map((item) => ({
-    ten_dia_diem: ensureString((item as Record<string, unknown>)?.ten_dia_diem || (item as Record<string, unknown>)?.name),
-    gia_ve: normalizeNumber((item as Record<string, unknown>)?.gia_ve || (item as Record<string, unknown>)?.ticketPrice),
-    ten_tinh: ensureString((item as Record<string, unknown>)?.ten_tinh || (item as Record<string, unknown>)?.province),
-  }));
+  // Handle danh_sach_dia_diem - can be nested structure from Gemini
+  const diaDiemRaw = source.danh_sach_dia_diem || source.attractions;
+  if (Array.isArray(diaDiemRaw)) {
+    base.danh_sach_dia_diem = [];
+    diaDiemRaw.forEach((item) => {
+      if (typeof item === 'object' && item !== null) {
+        const itemObj = item as Record<string, unknown>;
+        
+        // Check if it's the nested structure: { tinh: "...", dia_diem: [...] }
+        if (itemObj.tinh && Array.isArray(itemObj.dia_diem)) {
+          const tinh = ensureString(itemObj.tinh);
+          const diaDiemList = itemObj.dia_diem as string[];
+          diaDiemList.forEach((diaDiem) => {
+            base.danh_sach_dia_diem.push({
+              ten_dia_diem: ensureString(diaDiem),
+              gia_ve: 0,
+              ten_tinh: tinh,
+            });
+          });
+        } else {
+          // Handle flat structure
+          base.danh_sach_dia_diem.push({
+            ten_dia_diem: ensureString(itemObj.ten_dia_diem || itemObj.name),
+            gia_ve: normalizeNumber(itemObj.gia_ve || itemObj.ticketPrice),
+            ten_tinh: ensureString(itemObj.ten_tinh || itemObj.province),
+          });
+        }
+      }
+    });
+  }
 
   base.danh_sach_chi_phi = ensureArray(source.danh_sach_chi_phi || source.expenses).map((item) => ({
     ngay: ensureString((item as Record<string, unknown>)?.ngay || (item as Record<string, unknown>)?.date),
@@ -139,12 +181,31 @@ export const normalizeAiTour = (raw: unknown): TourData => {
     thanh_tien: normalizeNumber((item as Record<string, unknown>)?.thanh_tien || (item as Record<string, unknown>)?.totalAmount),
   }));
 
-  base.khach_san = ensureArray(source.khach_san || source.hotels).map((item) => ({
-    ngay: ensureString((item as Record<string, unknown>)?.ngay || (item as Record<string, unknown>)?.date),
-    ten: ensureString((item as Record<string, unknown>)?.ten || (item as Record<string, unknown>)?.name),
-    dia_chi: ensureString((item as Record<string, unknown>)?.dia_chi || (item as Record<string, unknown>)?.address),
-    so_dien_thoai: ensureString((item as Record<string, unknown>)?.so_dien_thoai || (item as Record<string, unknown>)?.phone),
-  }));
+  // Handle khach_san - can be array of strings or array of objects
+  const khachSanRaw = source.khach_san || source.hotels;
+  if (Array.isArray(khachSanRaw)) {
+    base.khach_san = khachSanRaw.map((item) => {
+      if (typeof item === 'string') {
+        // If it's a string, create object with ten field
+        return {
+          ngay: '',
+          ten: item,
+          dia_chi: '',
+          so_dien_thoai: '',
+        };
+      } else if (typeof item === 'object' && item !== null) {
+        // If it's an object, extract fields
+        const itemObj = item as Record<string, unknown>;
+        return {
+          ngay: ensureString(itemObj.ngay || itemObj.date),
+          ten: ensureString(itemObj.ten || itemObj.name),
+          dia_chi: ensureString(itemObj.dia_chi || itemObj.address),
+          so_dien_thoai: ensureString(itemObj.so_dien_thoai || itemObj.dien_thoai || itemObj.phone),
+        };
+      }
+      return { ngay: '', ten: '', dia_chi: '', so_dien_thoai: '' };
+    });
+  }
 
   const tip = source.tip as Record<string, unknown> | undefined;
   base.tip = {
