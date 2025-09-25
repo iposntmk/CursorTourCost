@@ -1,6 +1,19 @@
 import { STORAGE_KEYS } from '../../constants/storageKeys';
 
-const BASE_URL = import.meta.env.VITE_CLOUD_FUNCTIONS_URL ?? 'https://asia-southeast1-quantum-ratio-468010-d4.cloudfunctions.net';
+const DEFAULT_API_BASE = 'https://asia-southeast1-quantum-ratio-468010-d4.cloudfunctions.net/api';
+
+const resolveApiBaseUrl = () => {
+  const rawBase =
+    import.meta.env.VITE_API_BASE ?? import.meta.env.VITE_CLOUD_FUNCTIONS_URL ?? DEFAULT_API_BASE;
+
+  const trimmedBase = rawBase.replace(/\/+$/, '');
+  if (/\/api(\/|$)/.test(trimmedBase)) {
+    return trimmedBase;
+  }
+  return `${trimmedBase}/api`;
+};
+
+const BASE_URL = resolveApiBaseUrl();
 
 const resolveApiKey = () => {
   if (typeof window === 'undefined') return '';
