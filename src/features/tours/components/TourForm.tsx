@@ -262,7 +262,7 @@ export const TourForm = ({ value, onChange, masterData }: TourFormProps) => {
           <div className="space-y-4">
             {value.danh_sach_ngay_tham_quan.map((item, index) => (
               <div key={index} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto] md:items-end">
+                <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-[1fr_1fr_auto] md:items-end">
                   <div>
                     <label className="text-xs font-semibold uppercase text-slate-500">Ngày</label>
                     <input
@@ -285,7 +285,7 @@ export const TourForm = ({ value, onChange, masterData }: TourFormProps) => {
                   <button
                     type="button"
                     onClick={() => removeNgay(index)}
-                    className="mt-1 inline-flex h-9 items-center justify-center rounded-md border border-red-200 px-3 text-xs font-semibold text-red-500 hover:bg-red-50"
+                    className="mt-1 inline-flex h-9 items-center justify-center rounded-md border border-red-200 px-3 text-xs font-semibold text-red-500 hover:bg-red-50 sm:col-span-2 md:col-auto"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -319,7 +319,7 @@ export const TourForm = ({ value, onChange, masterData }: TourFormProps) => {
           <div className="space-y-4">
             {value.danh_sach_dia_diem.map((item, index) => (
               <div key={index} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                <div className="grid gap-3 md:grid-cols-[1.5fr_1fr_1fr_auto] md:items-end">
+                <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-[1.5fr_1fr_1fr_auto] md:items-end">
                   <div>
                     <label className="text-xs font-semibold uppercase text-slate-500">Tên địa điểm</label>
                     <input
@@ -352,7 +352,7 @@ export const TourForm = ({ value, onChange, masterData }: TourFormProps) => {
                   <button
                     type="button"
                     onClick={() => removeDiaDiem(index)}
-                    className="mt-1 inline-flex h-9 items-center justify-center rounded-md border border-red-200 px-3 text-xs font-semibold text-red-500 hover:bg-red-50"
+                    className="mt-1 inline-flex h-9 items-center justify-center rounded-md border border-red-200 px-3 text-xs font-semibold text-red-500 hover:bg-red-50 sm:col-span-2 md:col-auto"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>
@@ -386,7 +386,7 @@ export const TourForm = ({ value, onChange, masterData }: TourFormProps) => {
           <div className="space-y-4">
             {value.danh_sach_chi_phi.map((item, index) => (
               <div key={index} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                <div className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto] md:items-end">
+                <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto] xl:items-end">
                   <div>
                     <label className="text-xs font-semibold uppercase text-slate-500">Ngày</label>
                     <input
@@ -443,7 +443,7 @@ export const TourForm = ({ value, onChange, masterData }: TourFormProps) => {
                       className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-primary-400 focus:ring-0"
                     />
                   </div>
-                  <div className="md:col-span-5">
+                  <div className="col-span-full">
                     <label className="text-xs font-semibold uppercase text-slate-500">Ghi chú</label>
                     <textarea
                       value={item.ghi_chu}
@@ -451,11 +451,11 @@ export const TourForm = ({ value, onChange, masterData }: TourFormProps) => {
                       className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:border-primary-400 focus:ring-0"
                     />
                   </div>
-                  <div className="md:col-auto">
+                  <div className="col-span-full xl:col-auto xl:justify-self-end">
                     <button
                       type="button"
                       onClick={() => removeChiPhi(index)}
-                      className="mt-1 inline-flex h-9 items-center justify-center rounded-md border border-red-200 px-3 text-xs font-semibold text-red-500 hover:bg-red-50"
+                      className="mt-1 inline-flex h-9 w-full items-center justify-center rounded-md border border-red-200 px-3 text-xs font-semibold text-red-500 hover:bg-red-50 xl:w-auto"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -491,7 +491,7 @@ export const TourForm = ({ value, onChange, masterData }: TourFormProps) => {
             <div className="space-y-3">
               {value.an.an_trua.map((item, index) => (
                 <div key={index} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <div className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto] md:items-end">
+                  <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-[1fr_1fr_1fr_auto] md:items-end">
                     <div>
                       <label className="text-xs font-semibold uppercase text-slate-500">Ngày</label>
                       <input
@@ -538,7 +538,7 @@ export const TourForm = ({ value, onChange, masterData }: TourFormProps) => {
                     <button
                       type="button"
                       onClick={() => removeBuaAn('an_trua', index)}
-                      className="mt-1 inline-flex h-9 items-center justify-center rounded-md border border-red-200 px-3 text-xs font-semibold text-red-500 hover:bg-red-50"
+                      className="mt-1 inline-flex h-9 items-center justify-center rounded-md border border-red-200 px-3 text-xs font-semibold text-red-500 hover:bg-red-50 sm:col-span-2 md:col-auto"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -570,7 +570,7 @@ export const TourForm = ({ value, onChange, masterData }: TourFormProps) => {
             <div className="space-y-3">
               {value.an.an_toi.map((item, index) => (
                 <div key={index} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <div className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto] md:items-end">
+                  <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-[1fr_1fr_1fr_auto] md:items-end">
                     <div>
                       <label className="text-xs font-semibold uppercase text-slate-500">Ngày</label>
                       <input
@@ -617,7 +617,7 @@ export const TourForm = ({ value, onChange, masterData }: TourFormProps) => {
                     <button
                       type="button"
                       onClick={() => removeBuaAn('an_toi', index)}
-                      className="mt-1 inline-flex h-9 items-center justify-center rounded-md border border-red-200 px-3 text-xs font-semibold text-red-500 hover:bg-red-50"
+                      className="mt-1 inline-flex h-9 items-center justify-center rounded-md border border-red-200 px-3 text-xs font-semibold text-red-500 hover:bg-red-50 sm:col-span-2 md:col-auto"
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
@@ -650,7 +650,7 @@ export const TourForm = ({ value, onChange, masterData }: TourFormProps) => {
           <div className="space-y-4">
             {value.khach_san.map((item, index) => (
               <div key={index} className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                <div className="grid gap-3 md:grid-cols-[1fr_1fr_1fr_1fr_auto] md:items-end">
+                <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-[1fr_1fr_1fr_1fr_auto] xl:items-end">
                   <div>
                     <label className="text-xs font-semibold uppercase text-slate-500">Ngày</label>
                     <input
@@ -686,7 +686,7 @@ export const TourForm = ({ value, onChange, masterData }: TourFormProps) => {
                   <button
                     type="button"
                     onClick={() => removeKhachSan(index)}
-                    className="mt-1 inline-flex h-9 items-center justify-center rounded-md border border-red-200 px-3 text-xs font-semibold text-red-500 hover:bg-red-50"
+                    className="mt-1 inline-flex h-9 w-full items-center justify-center rounded-md border border-red-200 px-3 text-xs font-semibold text-red-500 hover:bg-red-50 xl:w-auto xl:justify-self-end"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>

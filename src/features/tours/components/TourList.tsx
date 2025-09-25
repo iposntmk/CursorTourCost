@@ -40,7 +40,7 @@ export const TourList = () => {
           <EmptyState title="Chưa có tour" description="Hãy tạo tour mới hoặc đồng bộ từ Gemini." />
         ) : null}
         {!isLoading && !isError && data && data.length > 0 ? (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto -mx-6 px-6 sm:mx-0 sm:px-0">
             <table className="min-w-full divide-y divide-slate-200 text-sm">
               <thead className="bg-slate-50">
                 <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
