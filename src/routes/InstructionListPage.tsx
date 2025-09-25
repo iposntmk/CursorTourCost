@@ -1,4 +1,4 @@
-import { FormEvent, useMemo, useState } from 'react';
+import { FormEvent, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import clsx from 'clsx';
 import { useInstructions, useInstructionMutations } from '../features/instructions/hooks/useInstructions';
@@ -18,6 +18,8 @@ const InstructionListPage = () => {
   const [isCreating, setIsCreating] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
   const [isCreateSectionOpen, setIsCreateSectionOpen] = useState(false);
+  const titleRef = useRef<HTMLInputElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
   const [filters, setFilters] = useState({
     title: '',
     goal: '',
@@ -55,6 +57,11 @@ const InstructionListPage = () => {
     if (hasMissingRequired) {
       setShowValidation(true);
       showToast({ message: 'Vui lòng điền đầy đủ tiêu đề và nội dung chính.', type: 'error' });
+      if (!newInstruction.title.trim()) {
+        titleRef.current?.focus();
+      } else if (!newInstruction.body.trim()) {
+        bodyRef.current?.focus();
+      }
       return;
     }
     setIsCreating(true);
@@ -153,6 +160,7 @@ const InstructionListPage = () => {
                   onChange={(event) => setNewInstruction((prev) => ({ ...prev, title: event.target.value }))}
                   onBlur={() => setShowValidation(true)}
                   className={requiredInputClasses(showValidation && !newInstruction.title.trim())}
+                  ref={titleRef}
                 />
               </div>
               <div>
@@ -186,6 +194,7 @@ const InstructionListPage = () => {
                   onChange={(event) => setNewInstruction((prev) => ({ ...prev, body: event.target.value }))}
                   onBlur={() => setShowValidation(true)}
                   className={requiredInputClasses(showValidation && !newInstruction.body.trim())}
+                  ref={bodyRef}
                 />
               </div>
               <div>
