@@ -179,6 +179,94 @@ apiRouter.post("/ai/extract", async (req, res) => {
   }
 });
 
+// Endpoint to save custom prompt
+apiRouter.post("/prompt/save", async (req, res) => {
+  try {
+    const {prompt, name, description} = req.body as {
+      prompt: string;
+      name?: string;
+      description?: string;
+    };
+
+    if (!prompt || prompt.trim().length === 0) {
+      return res.status(400).json({
+        error: "Prompt is required",
+      });
+    }
+
+    const db = admin.firestore();
+    const promptData = {
+      prompt: prompt.trim(),
+      name: name?.trim() || "Custom Prompt",
+      description: description?.trim() || "",
+      createdAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      usageCount: 0,
+    };
+
+    const docRef = await db.collection("custom_prompts").add(promptData);
+
+    return res.json({
+      id: docRef.id,
+      ...promptData,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (err) {
+    console.error("Error saving custom prompt", err);
+    return res.status(500).json({
+      error: "Failed to save custom prompt",
+      details: (err as Error).message,
+    });
+  }
+});
+
+// Endpoint to get saved custom prompts
+apiRouter.get("/prompt/saved", async (_req, res) => {
+  try {
+    const db = admin.firestore();
+    const snapshot = await db
+      .collection("custom_prompts")
+      .orderBy("updatedAt", "desc")
+      .limit(50)
+      .get();
+
+    const prompts = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    }));
+
+    return res.json({prompts});
+  } catch (err) {
+    console.error("Error fetching saved prompts", err);
+    return res.status(500).json({
+      error: "Failed to fetch saved prompts",
+      details: (err as Error).message,
+    });
+  }
+});
+
+// Endpoint to update usage count of a prompt
+apiRouter.post("/prompt/:id/use", async (req, res) => {
+  try {
+    const {id} = req.params;
+    const db = admin.firestore();
+
+    await db.collection("custom_prompts").doc(id).update({
+      usageCount: admin.firestore.FieldValue.increment(1),
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    });
+
+    return res.json({success: true});
+  } catch (err) {
+    console.error("Error updating prompt usage", err);
+    return res.status(500).json({
+      error: "Failed to update prompt usage",
+      details: (err as Error).message,
+    });
+  }
+});
+
 // Mount API router both at root and /api for backward compatibility
 app.use("/", apiRouter);
 app.use("/api", apiRouter);

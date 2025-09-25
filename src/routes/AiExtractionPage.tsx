@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/common/Card';
 import { queryKeys } from '../constants/queryKeys';
-import { fetchLatestPrompt, requestAiExtraction } from '../features/ai/api';
+import { fetchLatestPrompt, requestAiExtraction, saveCustomPrompt, fetchSavedPrompts, CustomPrompt } from '../features/ai/api';
 import { createAjvInstance, formatAjvErrors } from '../lib/ajv';
 import { useActiveSchemas } from '../features/schemas/hooks/useSchemas';
 import {
@@ -46,10 +46,26 @@ const AiExtractionPage = () => {
     isError: activeRulesError,
   } = useInstructionRuleSets(activeInstructionIds);
 
+  // Fetch saved prompts
+  const { 
+    data: savedPromptsData, 
+    isLoading: loadingSavedPrompts,
+    refetch: refetchSavedPrompts 
+  } = useQuery({
+    queryKey: ['saved-prompts'],
+    queryFn: fetchSavedPrompts,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
+
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
   const [overrides, setOverrides] = useState('');
   const [customPrompt, setCustomPrompt] = useState('');
+  const [showSavePromptDialog, setShowSavePromptDialog] = useState(false);
+  const [promptToSave, setPromptToSave] = useState('');
+  const [promptName, setPromptName] = useState('');
+  const [promptDescription, setPromptDescription] = useState('');
+  const [isSavingPrompt, setIsSavingPrompt] = useState(false);
   const [desiredJsonFormat, setDesiredJsonFormat] = useState(`{
   "thong_tin_chung": {
     "ma_tour": "(Tour Code)",
@@ -218,6 +234,14 @@ const AiExtractionPage = () => {
       setParsedJson(parsed);
       showToast({ message: 'Đã gọi Gemini thành công.', type: 'success' });
 
+      // Show save prompt dialog if custom prompt was used
+      if (customPrompt.trim()) {
+        setPromptToSave(finalPromptText);
+        setPromptName(`Custom Prompt - ${new Date().toLocaleDateString('vi-VN')}`);
+        setPromptDescription(`Prompt tùy chỉnh được tạo ngày ${new Date().toLocaleDateString('vi-VN')}`);
+        setShowSavePromptDialog(true);
+      }
+
       if (validationSchema) {
         const ajv = createAjvInstance();
         const validate = ajv.compile(validationSchema as Record<string, unknown>);
@@ -236,6 +260,47 @@ const AiExtractionPage = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSavePrompt = async () => {
+    if (!promptToSave.trim()) return;
+    
+    setIsSavingPrompt(true);
+    try {
+      await saveCustomPrompt({
+        prompt: promptToSave,
+        name: promptName.trim() || 'Custom Prompt',
+        description: promptDescription.trim(),
+      });
+      
+      showToast({ 
+        message: 'Đã lưu prompt tùy chỉnh thành công!', 
+        type: 'success' 
+      });
+      
+      // Refresh saved prompts list
+      refetchSavedPrompts();
+      
+      setShowSavePromptDialog(false);
+      setPromptToSave('');
+      setPromptName('');
+      setPromptDescription('');
+    } catch (error) {
+      showToast({ 
+        message: `Không thể lưu prompt: ${(error as Error).message}`, 
+        type: 'error' 
+      });
+    } finally {
+      setIsSavingPrompt(false);
+    }
+  };
+
+  const handleLoadSavedPrompt = (prompt: CustomPrompt) => {
+    setCustomPrompt(prompt.prompt);
+    showToast({ 
+      message: `Đã tải prompt "${prompt.name}"`, 
+      type: 'success' 
+    });
   };
 
   const handleLoadToTour = () => {
@@ -436,6 +501,77 @@ const AiExtractionPage = () => {
           </form>
         </CardContent>
       </Card>
+
+      {/* Saved Prompts Section */}
+      {savedPromptsData?.prompts && savedPromptsData.prompts.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-wide text-primary-600">Prompt Đã Lưu</p>
+                  <h2 className="text-xl font-semibold text-slate-900">Prompt tùy chỉnh đã lưu</h2>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => refetchSavedPrompts()}
+                  className="text-sm text-slate-500 hover:text-slate-700"
+                >
+                  Làm mới
+                </button>
+              </div>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              {savedPromptsData.prompts.map((prompt) => (
+                <div
+                  key={prompt.id}
+                  className="border border-slate-200 rounded-lg p-4 hover:border-primary-300 transition-colors"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-medium text-slate-900 truncate">
+                        {prompt.name}
+                      </h3>
+                      {prompt.description && (
+                        <p className="text-xs text-slate-500 mt-1 line-clamp-2">
+                          {prompt.description}
+                        </p>
+                      )}
+                      <div className="flex items-center gap-4 mt-2 text-xs text-slate-400">
+                        <span>Tạo: {new Date(prompt.createdAt).toLocaleDateString('vi-VN')}</span>
+                        <span>Sử dụng: {prompt.usageCount} lần</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 ml-4">
+                      <button
+                        type="button"
+                        onClick={() => handleLoadSavedPrompt(prompt)}
+                        className="px-3 py-1 text-xs font-medium text-primary-600 bg-primary-50 border border-primary-200 rounded-md hover:bg-primary-100 transition-colors"
+                      >
+                        Sử dụng
+                      </button>
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <details className="group">
+                      <summary className="text-xs text-slate-500 cursor-pointer hover:text-slate-700">
+                        Xem nội dung prompt
+                      </summary>
+                      <div className="mt-2 p-3 bg-slate-50 rounded-md">
+                        <pre className="text-xs text-slate-600 whitespace-pre-wrap font-mono overflow-x-auto">
+                          {prompt.prompt}
+                        </pre>
+                      </div>
+                    </details>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -646,6 +782,79 @@ const AiExtractionPage = () => {
           </CardContent>
         </Card>
       ) : null}
+
+      {/* Save Prompt Dialog */}
+      {showSavePromptDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-slate-900 mb-4">
+                Lưu Prompt Tùy Chỉnh
+              </h3>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Tên Prompt
+                  </label>
+                  <input
+                    type="text"
+                    value={promptName}
+                    onChange={(e) => setPromptName(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    placeholder="Nhập tên cho prompt..."
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Mô tả
+                  </label>
+                  <textarea
+                    value={promptDescription}
+                    onChange={(e) => setPromptDescription(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                    rows={3}
+                    placeholder="Mô tả ngắn về prompt này..."
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                    Nội dung Prompt
+                  </label>
+                  <textarea
+                    value={promptToSave}
+                    onChange={(e) => setPromptToSave(e.target.value)}
+                    className="w-full px-3 py-2 border border-slate-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent font-mono text-sm"
+                    rows={8}
+                    readOnly
+                  />
+                </div>
+              </div>
+              
+              <div className="flex justify-end space-x-3 mt-6">
+                <button
+                  type="button"
+                  onClick={() => setShowSavePromptDialog(false)}
+                  className="px-4 py-2 text-sm font-medium text-slate-700 bg-slate-100 border border-slate-300 rounded-md hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-500"
+                  disabled={isSavingPrompt}
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSavePrompt}
+                  disabled={isSavingPrompt || !promptToSave.trim()}
+                  className="px-4 py-2 text-sm font-medium text-white bg-primary-600 border border-transparent rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isSavingPrompt ? 'Đang lưu...' : 'Lưu Prompt'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

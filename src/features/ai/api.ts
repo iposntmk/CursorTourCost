@@ -97,3 +97,42 @@ export const importMasterDataCsv = async (payload: { type: string; rows: unknown
   });
   return handleResponse(res);
 };
+
+// Custom Prompt API functions
+export interface CustomPrompt {
+  id: string;
+  prompt: string;
+  name: string;
+  description: string;
+  createdAt: string;
+  updatedAt: string;
+  usageCount: number;
+}
+
+export const saveCustomPrompt = async (data: {
+  prompt: string;
+  name?: string;
+  description?: string;
+}) => {
+  const res = await fetch(`${BASE_URL}/prompt/save`, {
+    method: 'POST',
+    headers: withApiKey({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(data),
+  });
+  return handleResponse(res) as Promise<CustomPrompt>;
+};
+
+export const fetchSavedPrompts = async () => {
+  const res = await fetch(`${BASE_URL}/prompt/saved`, {
+    headers: withApiKey(),
+  });
+  return handleResponse(res) as Promise<{ prompts: CustomPrompt[] }>;
+};
+
+export const incrementPromptUsage = async (promptId: string) => {
+  const res = await fetch(`${BASE_URL}/prompt/${promptId}/use`, {
+    method: 'POST',
+    headers: withApiKey(),
+  });
+  return handleResponse(res);
+};
