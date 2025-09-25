@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/common/Card';
 import { queryKeys } from '../constants/queryKeys';
-import { fetchLatestPrompt, requestAiExtraction, saveCustomPrompt, fetchSavedPrompts, CustomPrompt } from '../features/ai/api';
+import { fetchLatestPrompt, requestAiExtraction, saveCustomPrompt, fetchSavedPrompts, CustomPrompt, optimizePrompt } from '../features/ai/api';
 import { createAjvInstance, formatAjvErrors } from '../lib/ajv';
 import { useActiveSchemas } from '../features/schemas/hooks/useSchemas';
 import {
@@ -17,6 +17,48 @@ import { normalizeAiTour } from '../features/ai/utils';
 import { useTourDraft } from '../hooks/useTourDraft';
 import { TourData } from '../types/tour';
 import { useToast } from '../hooks/useToast';
+import { saveImageToStorage, getSavedImages, deleteSavedImage, SavedImage, formatFileSize } from '../utils/imageStorage';
+import { ChevronDownIcon, ChevronRightIcon } from 'lucide-react';
+
+// Collapsible Section Component
+interface CollapsibleSectionProps {
+  title: string;
+  subtitle?: string;
+  isExpanded: boolean;
+  onToggle: () => void;
+  children: React.ReactNode;
+  className?: string;
+}
+
+const CollapsibleSection = ({ title, subtitle, isExpanded, onToggle, children, className = '' }: CollapsibleSectionProps) => (
+  <Card className={className}>
+    <CardHeader>
+      <CardTitle>
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex w-full items-center justify-between text-left hover:bg-slate-50 rounded-lg p-2 -m-2 transition-colors"
+        >
+          <div>
+            <p className="text-sm font-semibold uppercase tracking-wide text-primary-600">{title}</p>
+            <h2 className="text-xl font-semibold text-slate-900">{subtitle || title}</h2>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-500">
+              {isExpanded ? 'Thu gọn' : 'Mở rộng'}
+            </span>
+            {isExpanded ? (
+              <ChevronDownIcon className="h-5 w-5 text-slate-500" />
+            ) : (
+              <ChevronRightIcon className="h-5 w-5 text-slate-500" />
+            )}
+          </div>
+        </button>
+      </CardTitle>
+    </CardHeader>
+    {isExpanded && <CardContent>{children}</CardContent>}
+  </Card>
+);
 
 const AiExtractionPage = () => {
   const navigate = useNavigate();
@@ -100,6 +142,23 @@ const AiExtractionPage = () => {
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
+  const [saveImageToBrowser, setSaveImageToBrowser] = useState(false);
+  const [savedImages, setSavedImages] = useState<SavedImage[]>([]);
+  const [sectionStates, setSectionStates] = useState({
+    upload: true,        // Upload section - expanded by default
+    customPrompt: true,  // Custom prompt section - expanded by default
+    jsonFormat: true,    // JSON format section - expanded by default
+    overrides: true,    // Overrides section - expanded by default
+    savedPrompts: true, // Saved prompts section - expanded by default
+    savedImages: true, // Saved images section - expanded by default
+    currentPrompt: true, // Current prompt section - expanded by default
+    results: true,      // Results section - expanded by default
+  });
+  const [optimizePromptEnabled, setOptimizePromptEnabled] = useState(false);
+  const [optimizationType, setOptimizationType] = useState<'clarity' | 'structure' | 'completeness' | 'all'>('all');
+  const [isOptimizing, setIsOptimizing] = useState(false);
+  const [optimizedPrompt, setOptimizedPrompt] = useState<string>('');
+  const [optimizationResult, setOptimizationResult] = useState<string>('');
 
   useEffect(() => {
     if (!uploadedFile) {
@@ -114,6 +173,137 @@ const AiExtractionPage = () => {
       URL.revokeObjectURL(objectUrl);
     };
   }, [uploadedFile]);
+
+  // Load saved images on component mount
+  useEffect(() => {
+    setSavedImages(getSavedImages());
+  }, []);
+
+  // Toggle section function
+  const toggleSection = (section: keyof typeof sectionStates) => {
+    setSectionStates(prev => ({
+      ...prev,
+      [section]: !prev[section]
+    }));
+  };
+
+  // Fallback optimization function
+  const performFallbackOptimization = (prompt: string, type: string) => {
+    let optimized = prompt;
+    let explanation = '';
+
+    switch (type) {
+      case 'clarity':
+        optimized = prompt
+          .replace(/\s+/g, ' ')
+          .replace(/\.\s*\./g, '.')
+          .trim();
+        explanation = 'Đã làm sạch khoảng trắng thừa và cải thiện độ rõ ràng của prompt.';
+        break;
+      
+      case 'structure': {
+        const structureLines = prompt.split('\n').filter(line => line.trim());
+        optimized = structureLines
+          .map((line, index) => {
+            if (index === 0) return line;
+            if (line.includes('IMPORTANT') || line.includes('QUAN TRỌNG')) return `\n${line}`;
+            if (line.includes('---')) return `\n${line}`;
+            return line;
+          })
+          .join('\n');
+        explanation = 'Đã cải thiện cấu trúc và định dạng của prompt.';
+        break;
+      }
+      
+      case 'completeness':
+        if (!prompt.includes('JSON format') && !prompt.includes('định dạng JSON')) {
+          optimized = prompt + '\n\nIMPORTANT: Please return the extracted data in valid JSON format.';
+          explanation = 'Đã thêm yêu cầu về định dạng JSON để đảm bảo tính hoàn chỉnh.';
+        } else {
+          optimized = prompt;
+          explanation = 'Prompt đã đầy đủ thông tin cần thiết.';
+        }
+        break;
+      
+      default: { // 'all'
+        optimized = prompt
+          .replace(/\s+/g, ' ')
+          .replace(/\.\s*\./g, '.')
+          .trim();
+        
+        const allLines = optimized.split('\n').filter(line => line.trim());
+        optimized = allLines
+          .map((line, index) => {
+            if (index === 0) return line;
+            if (line.includes('IMPORTANT') || line.includes('QUAN TRỌNG')) return `\n${line}`;
+            if (line.includes('---')) return `\n${line}`;
+            return line;
+          })
+          .join('\n');
+        
+        explanation = 'Đã tối ưu prompt về độ rõ ràng, cấu trúc và tính hoàn chỉnh.';
+        break;
+      }
+    }
+
+    return { optimized, explanation };
+  };
+
+  // Optimize prompt function
+  const handleOptimizePrompt = async () => {
+    if (!finalPromptText.trim()) {
+      showToast({ message: 'Không có prompt để tối ưu.', type: 'error' });
+      return;
+    }
+
+    setIsOptimizing(true);
+    setOptimizationResult('');
+    setOptimizedPrompt('');
+
+    try {
+      const response = await optimizePrompt({
+        prompt: finalPromptText,
+        context: 'Trích xuất thông tin tour từ hình ảnh chương trình du lịch',
+        optimizationType,
+      });
+
+      setOptimizedPrompt(response.optimizedPrompt || response.prompt || '');
+      setOptimizationResult(response.explanation || response.reasoning || '');
+      
+      showToast({ 
+        message: 'Đã tối ưu prompt thành công!', 
+        type: 'success' 
+      });
+    } catch (error) {
+      const errorMessage = (error as Error).message;
+      
+      // Show specific error message
+      showToast({ 
+        message: errorMessage, 
+        type: 'error' 
+      });
+
+      // Offer fallback optimization
+      if (errorMessage.includes('không tồn tại') || errorMessage.includes('chưa được hỗ trợ')) {
+        const shouldUseFallback = window.confirm(
+          'Tính năng tối ưu prompt bằng AI chưa khả dụng. Bạn có muốn sử dụng tối ưu cơ bản (local) không?'
+        );
+        
+        if (shouldUseFallback) {
+          const { optimized, explanation } = performFallbackOptimization(finalPromptText, optimizationType);
+          setOptimizedPrompt(optimized);
+          setOptimizationResult(`Tối ưu cơ bản: ${explanation}`);
+          
+          showToast({ 
+            message: 'Đã áp dụng tối ưu cơ bản.', 
+            type: 'info' 
+          });
+        }
+      }
+    } finally {
+      setIsOptimizing(false);
+    }
+  };
 
   const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -234,6 +424,23 @@ const AiExtractionPage = () => {
       setParsedJson(parsed);
       showToast({ message: 'Đã gọi Gemini thành công.', type: 'success' });
 
+      // Save image to browser storage if checkbox is checked
+      if (saveImageToBrowser && uploadedFile) {
+        try {
+          const savedImage = await saveImageToStorage(uploadedFile);
+          setSavedImages(prev => [savedImage, ...prev.slice(0, 9)]); // Keep only 10 images
+          showToast({ 
+            message: `Đã lưu ảnh "${uploadedFile.name}" vào trình duyệt.`, 
+            type: 'success' 
+          });
+        } catch (error) {
+          showToast({ 
+            message: `Không thể lưu ảnh: ${(error as Error).message}`, 
+            type: 'error' 
+          });
+        }
+      }
+
       // Show save prompt dialog if custom prompt was used
       if (customPrompt.trim()) {
         setPromptToSave(finalPromptText);
@@ -317,8 +524,8 @@ const AiExtractionPage = () => {
   );
   
   const finalPromptText = useMemo(() => {
-    // Use custom prompt if provided, otherwise use composed prompt
-    const basePrompt = customPrompt.trim() || composedPrompt;
+    // Use optimized prompt if available and enabled, otherwise use custom/composed prompt
+    const basePrompt = optimizedPrompt.trim() || customPrompt.trim() || composedPrompt;
     
     // Add desired JSON format instruction
     const jsonFormatInstruction = `\n\nIMPORTANT: Please return the extracted data in the following JSON format:\n\`\`\`json\n${desiredJsonFormat}\n\`\`\`\n\nMake sure to fill in the actual values and replace placeholders like "(Tour Code)", "(Guide Name)", etc. with the real data from the image.`;
@@ -328,7 +535,7 @@ const AiExtractionPage = () => {
       .filter((section): section is string => Boolean(section && section.length > 0));
     
     return sections.join('\n\n---\n\n') + jsonFormatInstruction;
-  }, [customPrompt, composedPrompt, promptData?.prompt, desiredJsonFormat]);
+  }, [optimizedPrompt, customPrompt, composedPrompt, promptData?.prompt, desiredJsonFormat]);
 
   if (loadingSchemas || loadingPrompt || loadingActiveInstructions || loadingActiveRules) {
     return <LoadingState label="Đang tải cấu hình AI..." />;
@@ -350,16 +557,12 @@ const AiExtractionPage = () => {
 
   return (
     <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-wide text-primary-600">Trích xuất Gemini</p>
-              <h2 className="text-xl font-semibold text-slate-900">Nhận diện từ ảnh chương trình tour</h2>
-            </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
+      <CollapsibleSection
+        title="Trích xuất Gemini"
+        subtitle="Nhận diện từ ảnh chương trình tour"
+        isExpanded={sectionStates.upload}
+        onToggle={() => toggleSection('upload')}
+      >
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="text-sm font-medium text-slate-700">Tải ảnh chương trình tour</label>
@@ -374,75 +577,51 @@ const AiExtractionPage = () => {
               />
               {fileError ? <p className="mt-2 text-xs text-red-500">{fileError}</p> : null}
               {uploadedFile ? (
-                <div className="mt-3 flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  {filePreviewUrl ? (
-                    <img
-                      src={filePreviewUrl}
-                      alt={uploadedFile.name}
-                      className="h-16 w-16 rounded-md object-cover"
+                <div className="mt-3 space-y-3">
+                  <div className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    {filePreviewUrl ? (
+                      <img
+                        src={filePreviewUrl}
+                        alt={uploadedFile.name}
+                        className="h-16 w-16 rounded-md object-cover"
+                      />
+                    ) : null}
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-slate-700">{uploadedFile.name}</p>
+                      <p className="text-xs text-slate-500">
+                        {(uploadedFile.size / 1024).toFixed(1)} KB · {uploadedFile.type || 'Không rõ định dạng'}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUploadedFile(null);
+                          setFilePreviewUrl(null);
+                        }}
+                        className="mt-2 text-xs font-medium text-primary-600 hover:underline"
+                      >
+                        Xoá ảnh đã chọn
+                      </button>
+                    </div>
+                  </div>
+                  
+                  {/* Save to browser checkbox */}
+                  <div className="flex items-center gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3">
+                    <input
+                      id="saveImageToBrowser"
+                      type="checkbox"
+                      checked={saveImageToBrowser}
+                      onChange={(e) => setSaveImageToBrowser(e.target.checked)}
+                      className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
                     />
-                  ) : null}
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-slate-700">{uploadedFile.name}</p>
-                    <p className="text-xs text-slate-500">
-                      {(uploadedFile.size / 1024).toFixed(1)} KB · {uploadedFile.type || 'Không rõ định dạng'}
-                    </p>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setUploadedFile(null);
-                        setFilePreviewUrl(null);
-                      }}
-                      className="mt-2 text-xs font-medium text-primary-600 hover:underline"
-                    >
-                      Xoá ảnh đã chọn
-                    </button>
+                    <label htmlFor="saveImageToBrowser" className="text-sm text-slate-700">
+                      <span className="font-medium">Lưu ảnh vào trình duyệt</span>
+                      <span className="block text-xs text-slate-500">
+                        Ảnh sẽ được lưu trong localStorage để sử dụng lại sau này
+                      </span>
+                    </label>
                   </div>
                 </div>
               ) : null}
-            </div>
-            
-            {/* Custom Prompt */}
-            <div>
-              <label className="text-sm font-medium text-slate-700">Prompt tùy chỉnh</label>
-              <p className="mt-1 text-xs text-slate-500">
-                Nhập prompt tùy chỉnh để hướng dẫn Gemini trích xuất thông tin. Để trống để sử dụng prompt mặc định từ hệ thống.
-              </p>
-              <textarea
-                rows={6}
-                value={customPrompt}
-                onChange={(event) => setCustomPrompt(event.target.value)}
-                placeholder="Ví dụ: Hãy trích xuất thông tin tour từ hình ảnh này, bao gồm mã tour, tên guide, ngày bắt đầu và kết thúc..."
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary-400 focus:ring-0"
-              />
-            </div>
-
-            {/* Desired JSON Format */}
-            <div>
-              <label className="text-sm font-medium text-slate-700">Định dạng JSON mong muốn</label>
-              <p className="mt-1 text-xs text-slate-500">
-                Định nghĩa cấu trúc JSON mà bạn muốn Gemini trả về. Sử dụng placeholder như "(Tour Code)", "(Guide Name)" để chỉ định vị trí cần điền.
-              </p>
-              <textarea
-                rows={12}
-                value={desiredJsonFormat}
-                onChange={(event) => setDesiredJsonFormat(event.target.value)}
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono focus:border-primary-400 focus:ring-0"
-              />
-            </div>
-
-            <div>
-              <label className="text-sm font-medium text-slate-700">Ghi đè (JSON tuỳ chọn)</label>
-              <p className="mt-1 text-xs text-slate-500">
-                Cung cấp JSON để ghi đè thông tin mặc định khi gọi Gemini (ví dụ instructionId, schema...).
-              </p>
-              <textarea
-                rows={4}
-                value={overrides}
-                onChange={(event) => setOverrides(event.target.value)}
-                placeholder='{ "instructionId": "..." }'
-                className="mt-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary-400 focus:ring-0"
-              />
             </div>
             <div className="flex justify-end gap-3">
               <button
@@ -452,6 +631,10 @@ const AiExtractionPage = () => {
                   setFilePreviewUrl(null);
                   setOverrides('');
                   setCustomPrompt('');
+                  setSaveImageToBrowser(false);
+                  setOptimizePromptEnabled(false);
+                  setOptimizedPrompt('');
+                  setOptimizationResult('');
                   setDesiredJsonFormat(`{
   "thong_tin_chung": {
     "ma_tour": "(Tour Code)",
@@ -499,30 +682,87 @@ const AiExtractionPage = () => {
               </button>
             </div>
           </form>
-        </CardContent>
-      </Card>
+      </CollapsibleSection>
+
+      {/* Custom Prompt Section */}
+      <CollapsibleSection
+        title="Prompt Tùy Chỉnh"
+        subtitle="Nhập prompt tùy chỉnh để hướng dẫn Gemini"
+        isExpanded={sectionStates.customPrompt}
+        onToggle={() => toggleSection('customPrompt')}
+      >
+        <div>
+          <p className="text-xs text-slate-500 mb-3">
+            Nhập prompt tùy chỉnh để hướng dẫn Gemini trích xuất thông tin. Để trống để sử dụng prompt mặc định từ hệ thống.
+          </p>
+          <textarea
+            rows={6}
+            value={customPrompt}
+            onChange={(event) => setCustomPrompt(event.target.value)}
+            placeholder="Ví dụ: Hãy trích xuất thông tin tour từ hình ảnh này, bao gồm mã tour, tên guide, ngày bắt đầu và kết thúc..."
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary-400 focus:ring-0"
+          />
+        </div>
+      </CollapsibleSection>
+
+      {/* JSON Format Section */}
+      <CollapsibleSection
+        title="Định Dạng JSON"
+        subtitle="Cấu trúc JSON mong muốn cho kết quả"
+        isExpanded={sectionStates.jsonFormat}
+        onToggle={() => toggleSection('jsonFormat')}
+      >
+        <div>
+          <p className="text-xs text-slate-500 mb-3">
+            Định nghĩa cấu trúc JSON mà bạn muốn Gemini trả về. Sử dụng placeholder như "(Tour Code)", "(Guide Name)" để chỉ định vị trí cần điền.
+          </p>
+          <textarea
+            rows={12}
+            value={desiredJsonFormat}
+            onChange={(event) => setDesiredJsonFormat(event.target.value)}
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono focus:border-primary-400 focus:ring-0"
+          />
+        </div>
+      </CollapsibleSection>
+
+      {/* Overrides Section */}
+      <CollapsibleSection
+        title="Ghi Đè Cấu Hình"
+        subtitle="JSON để ghi đè thông tin mặc định"
+        isExpanded={sectionStates.overrides}
+        onToggle={() => toggleSection('overrides')}
+      >
+        <div>
+          <p className="text-xs text-slate-500 mb-3">
+            Cung cấp JSON để ghi đè thông tin mặc định khi gọi Gemini (ví dụ instructionId, schema...).
+          </p>
+          <textarea
+            rows={4}
+            value={overrides}
+            onChange={(event) => setOverrides(event.target.value)}
+            placeholder='{ "instructionId": "..." }'
+            className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-primary-400 focus:ring-0"
+          />
+        </div>
+      </CollapsibleSection>
 
       {/* Saved Prompts Section */}
       {savedPromptsData?.prompts && savedPromptsData.prompts.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold uppercase tracking-wide text-primary-600">Prompt Đã Lưu</p>
-                  <h2 className="text-xl font-semibold text-slate-900">Prompt tùy chỉnh đã lưu</h2>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => refetchSavedPrompts()}
-                  className="text-sm text-slate-500 hover:text-slate-700"
-                >
-                  Làm mới
-                </button>
-              </div>
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+        <CollapsibleSection
+          title="Prompt Đã Lưu"
+          subtitle="Prompt tùy chỉnh đã lưu"
+          isExpanded={sectionStates.savedPrompts}
+          onToggle={() => toggleSection('savedPrompts')}
+        >
+          <div className="flex justify-end mb-4">
+            <button
+              type="button"
+              onClick={() => refetchSavedPrompts()}
+              className="text-sm text-slate-500 hover:text-slate-700"
+            >
+              Làm mới
+            </button>
+          </div>
             <div className="space-y-3">
               {savedPromptsData.prompts.map((prompt) => (
                 <div
@@ -569,53 +809,264 @@ const AiExtractionPage = () => {
                 </div>
               ))}
             </div>
-          </CardContent>
-        </Card>
+        </CollapsibleSection>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            <div>
-              <p className="text-sm font-semibold uppercase tracking-wide text-primary-600">Prompt hiện tại</p>
-              <h2 className="text-xl font-semibold text-slate-900">Hướng dẫn & Schema</h2>
+      {/* Saved Images Section */}
+      {savedImages.length > 0 && (
+        <CollapsibleSection
+          title="Ảnh Đã Lưu"
+          subtitle="Ảnh đã lưu trong trình duyệt"
+          isExpanded={sectionStates.savedImages}
+          onToggle={() => toggleSection('savedImages')}
+        >
+          <div className="flex items-center justify-between mb-4">
+            <span className="text-sm text-slate-500">
+              {savedImages.length} ảnh
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm('Bạn có chắc chắn muốn xóa tất cả ảnh đã lưu?')) {
+                  localStorage.removeItem('saved_images');
+                  setSavedImages([]);
+                  showToast({ message: 'Đã xóa tất cả ảnh đã lưu.', type: 'success' });
+                }
+              }}
+              className="text-sm text-red-500 hover:text-red-700"
+            >
+              Xóa tất cả
+            </button>
+          </div>
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {savedImages.map((image) => (
+                <div
+                  key={image.id}
+                  className="border border-slate-200 rounded-lg p-4 hover:border-primary-300 transition-colors"
+                >
+                  <div className="flex items-start gap-3">
+                    <img
+                      src={`data:${image.mimeType};base64,${image.base64}`}
+                      alt={image.name}
+                      className="h-16 w-16 rounded-md object-cover flex-shrink-0"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-medium text-slate-900 truncate">
+                        {image.name}
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-1">
+                        {formatFileSize(image.size)} · {image.mimeType}
+                      </p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        Lưu: {new Date(image.savedAt).toLocaleDateString('vi-VN')}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 mt-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Convert base64 back to File object
+                        const byteCharacters = atob(image.base64);
+                        const byteNumbers = new Array(byteCharacters.length);
+                        for (let i = 0; i < byteCharacters.length; i++) {
+                          byteNumbers[i] = byteCharacters.charCodeAt(i);
+                        }
+                        const byteArray = new Uint8Array(byteNumbers);
+                        const file = new File([byteArray], image.name, { type: image.mimeType });
+                        
+                        setUploadedFile(file);
+                        setFilePreviewUrl(`data:${image.mimeType};base64,${image.base64}`);
+                        showToast({ 
+                          message: `Đã tải lại ảnh "${image.name}"`, 
+                          type: 'success' 
+                        });
+                      }}
+                      className="px-3 py-1 text-xs font-medium text-primary-600 bg-primary-50 border border-primary-200 rounded-md hover:bg-primary-100 transition-colors"
+                    >
+                      Sử dụng
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (window.confirm(`Bạn có chắc chắn muốn xóa ảnh "${image.name}"?`)) {
+                          deleteSavedImage(image.id);
+                          setSavedImages(prev => prev.filter(img => img.id !== image.id));
+                          showToast({ message: 'Đã xóa ảnh.', type: 'success' });
+                        }
+                      }}
+                      className="px-3 py-1 text-xs font-medium text-red-600 bg-red-50 border border-red-200 rounded-md hover:bg-red-100 transition-colors"
+                    >
+                      Xóa
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2">
+        </CollapsibleSection>
+      )}
+
+      <CollapsibleSection
+        title="Prompt hiện tại"
+        subtitle="Hướng dẫn & Schema"
+        isExpanded={sectionStates.currentPrompt}
+        onToggle={() => toggleSection('currentPrompt')}
+      >
+        {/* Prompt Optimization Controls */}
+        <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 p-4">
+          <div className="flex items-center justify-between mb-3">
             <div>
-              <p className="text-sm font-semibold text-slate-700">Prompt cuối cùng</p>
-              <textarea
-                readOnly
-                rows={12}
-                value={finalPromptText}
-                className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 font-mono overflow-x-auto"
-              />
+              <h3 className="text-sm font-semibold text-blue-900">Tối ưu Prompt bằng AI</h3>
+              <p className="text-xs text-blue-700">
+                Sử dụng AI để cải thiện chất lượng prompt trước khi gửi đến Gemini
+              </p>
+              <p className="text-xs text-blue-600 mt-1">
+                💡 Nếu AI không khả dụng, hệ thống sẽ đề xuất tối ưu cơ bản
+              </p>
             </div>
-            <div>
-              <p className="text-sm font-semibold text-slate-700">Schema đang dùng</p>
-              <textarea
-                readOnly
-                rows={12}
-                value={schemaDisplayText}
-                className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 font-mono overflow-x-auto"
+            <div className="flex items-center gap-2">
+              <input
+                id="optimizePromptEnabled"
+                type="checkbox"
+                checked={optimizePromptEnabled}
+                onChange={(e) => setOptimizePromptEnabled(e.target.checked)}
+                className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
               />
+              <label htmlFor="optimizePromptEnabled" className="text-sm text-blue-900">
+                Bật tối ưu
+              </label>
             </div>
           </div>
-        </CardContent>
-      </Card>
+          
+          {optimizePromptEnabled && (
+            <div className="space-y-3">
+              <div className="flex items-center gap-3">
+                <label className="text-sm font-medium text-blue-800">Loại tối ưu:</label>
+                <select
+                  value={optimizationType}
+                  onChange={(e) => setOptimizationType(e.target.value as any)}
+                  className="rounded-md border border-blue-300 px-3 py-1 text-sm focus:border-blue-500 focus:ring-0"
+                >
+                  <option value="all">Tất cả</option>
+                  <option value="clarity">Rõ ràng</option>
+                  <option value="structure">Cấu trúc</option>
+                  <option value="completeness">Hoàn chỉnh</option>
+                </select>
+                <button
+                  type="button"
+                  onClick={handleOptimizePrompt}
+                  disabled={isOptimizing || !finalPromptText.trim()}
+                  className="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:opacity-70"
+                >
+                  {isOptimizing ? 'Đang tối ưu...' : 'Tối ưu Prompt'}
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await optimizePrompt({
+                        prompt: 'Test prompt',
+                        context: 'Test',
+                        optimizationType: 'all'
+                      });
+                      showToast({ message: '✅ Kết nối API thành công!', type: 'success' });
+                    } catch (error) {
+                      showToast({ 
+                        message: `❌ ${(error as Error).message}`, 
+                        type: 'error' 
+                      });
+                    }
+                  }}
+                  className="inline-flex items-center justify-center rounded-lg border border-blue-300 px-3 py-2 text-sm font-semibold text-blue-700 transition hover:bg-blue-100"
+                >
+                  Test API
+                </button>
+              </div>
+              
+              {optimizationResult && (
+                <div className="rounded-md border border-green-200 bg-green-50 p-3">
+                  <h4 className="text-sm font-semibold text-green-800 mb-2">Giải thích tối ưu:</h4>
+                  <p className="text-xs text-green-700">{optimizationResult}</p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-2">
+          <div>
+            <p className="text-sm font-semibold text-slate-700">Prompt cuối cùng</p>
+            {optimizedPrompt && (
+              <div className="mb-2 rounded-md border border-green-200 bg-green-50 p-2">
+                <p className="text-xs font-medium text-green-800">✓ Đã sử dụng prompt tối ưu</p>
+              </div>
+            )}
+            <textarea
+              readOnly
+              rows={12}
+              value={finalPromptText}
+              className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 font-mono overflow-x-auto"
+            />
+          </div>
+          <div>
+            <p className="text-sm font-semibold text-slate-700">Schema đang dùng</p>
+            <textarea
+              readOnly
+              rows={12}
+              value={schemaDisplayText}
+              className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 font-mono overflow-x-auto"
+            />
+          </div>
+        </div>
+
+        {/* Optimized Prompt Preview */}
+        {optimizedPrompt && (
+          <div className="mt-4 rounded-lg border border-green-200 bg-green-50 p-4">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-sm font-semibold text-green-900">Prompt đã tối ưu</h3>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setOptimizedPrompt('');
+                    setOptimizationResult('');
+                    showToast({ message: 'Đã xóa prompt tối ưu.', type: 'info' });
+                  }}
+                  className="text-xs text-green-600 hover:text-green-800"
+                >
+                  Xóa
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(optimizedPrompt);
+                    showToast({ message: 'Đã sao chép prompt tối ưu.', type: 'success' });
+                  }}
+                  className="text-xs text-green-600 hover:text-green-800"
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+            <textarea
+              readOnly
+              rows={8}
+              value={optimizedPrompt}
+              className="w-full rounded-lg border border-green-300 bg-white px-3 py-2 text-sm text-slate-700 font-mono"
+            />
+          </div>
+        )}
+      </CollapsibleSection>
 
       {rawOutput ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>
-              <div>
-                <p className="text-sm font-semibold uppercase tracking-wide text-primary-600">Kết quả Gemini</p>
-                <h2 className="text-xl font-semibold text-slate-900">Dữ liệu trích xuất</h2>
-              </div>
-            </CardTitle>
-            {parsedJson ? (
+        <CollapsibleSection
+          title="Kết quả Gemini"
+          subtitle="Dữ liệu trích xuất"
+          isExpanded={sectionStates.results}
+          onToggle={() => toggleSection('results')}
+        >
+          {parsedJson ? (
+            <div className="flex justify-end mb-4">
               <button
                 type="button"
                 onClick={handleLoadToTour}
@@ -623,9 +1074,8 @@ const AiExtractionPage = () => {
               >
                 Đưa vào biểu mẫu tour
               </button>
-            ) : null}
-          </CardHeader>
-          <CardContent>
+            </div>
+          ) : null}
             {/* Summary Stats */}
             {parsedJson && typeof parsedJson === 'object' ? (
               <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -779,8 +1229,7 @@ const AiExtractionPage = () => {
                 </button>
               </div>
             </div>
-          </CardContent>
-        </Card>
+        </CollapsibleSection>
       ) : null}
 
       {/* Save Prompt Dialog */}

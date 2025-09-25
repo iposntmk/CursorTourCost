@@ -47,7 +47,26 @@ const withApiKey = (headers: HeadersInit = {}) => {
 const handleResponse = async (response: Response) => {
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(text || response.statusText);
+    
+    // Handle HTML error responses (like 404 pages)
+    if (text.includes('<!DOCTYPE html>') || text.includes('<html')) {
+      if (response.status === 404) {
+        throw new Error('API endpoint không tồn tại. Vui lòng kiểm tra cấu hình server.');
+      } else if (response.status === 500) {
+        throw new Error('Lỗi server nội bộ. Vui lòng thử lại sau.');
+      } else {
+        throw new Error(`Lỗi server (${response.status}). Vui lòng kiểm tra kết nối.`);
+      }
+    }
+    
+    // Handle JSON error responses
+    try {
+      const errorData = JSON.parse(text);
+      throw new Error(errorData.message || errorData.error || text || response.statusText);
+    } catch {
+      // If not JSON, use the text or status text
+      throw new Error(text || response.statusText);
+    }
   }
   return response.json();
 };
@@ -135,4 +154,45 @@ export const incrementPromptUsage = async (promptId: string) => {
     headers: withApiKey(),
   });
   return handleResponse(res);
+};
+
+// Prompt Optimization API functions
+export const optimizePrompt = async (body: {
+  prompt: string;
+  context?: string;
+  optimizationType?: 'clarity' | 'structure' | 'completeness' | 'all';
+}) => {
+  try {
+    const res = await fetch(`${BASE_URL}/ai/optimize-prompt`, {
+      method: 'POST',
+      headers: withApiKey({ 'Content-Type': 'application/json' }),
+      body: JSON.stringify(body),
+    });
+    return handleResponse(res);
+  } catch (error) {
+    // Provide more specific error messages
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      throw new Error('Không thể kết nối đến server. Vui lòng kiểm tra kết nối internet và cấu hình API.');
+    }
+    
+    if (error instanceof Error) {
+      // Check for specific error patterns
+      if (error.message.includes('404') || error.message.includes('không tồn tại')) {
+        throw new Error('Tính năng tối ưu prompt chưa được hỗ trợ trên server này. Vui lòng liên hệ quản trị viên.');
+      }
+      
+      if (error.message.includes('401') || error.message.includes('403')) {
+        throw new Error('Không có quyền truy cập tính năng tối ưu prompt. Vui lòng kiểm tra API key.');
+      }
+      
+      if (error.message.includes('500')) {
+        throw new Error('Server đang gặp sự cố. Vui lòng thử lại sau.');
+      }
+      
+      // Re-throw the original error if it's already user-friendly
+      throw error;
+    }
+    
+    throw new Error('Đã xảy ra lỗi không xác định khi tối ưu prompt.');
+  }
 };
