@@ -28,6 +28,16 @@ export const useInstructions = () =>
     },
   });
 
+export const useActiveInstruction = () =>
+  useQuery({
+    queryKey: queryKeys.activeInstruction,
+    queryFn: async () => {
+      const docs = await listDocuments<Instruction>(COLLECTION, 'updatedAt');
+      const active = docs.find((item) => item.status === 'active');
+      return active ? mapInstruction(active as Instruction & { id: string }) : null;
+    },
+  });
+
 export const useInstruction = (id?: string) =>
   useQuery({
     queryKey: id ? queryKeys.instruction(id) : ['instruction', 'empty'],
