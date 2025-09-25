@@ -12,19 +12,20 @@ const allowedOrigins = [
   "https://your-frontend-domain.com", // đổi sang domain production thật của bạn
 ];
 
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, cb) => {
+    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    return cb(new Error("Not allowed by CORS"));
+  },
+  methods: ["GET", "POST", "OPTIONS"],
+  credentials: true,
+};
+
 app.use(express.json({limit: "15mb"}));
 app.use(express.urlencoded({extended: true, limit: "15mb"}));
 
-app.use(
-  cors({
-    origin: (origin, cb) => {
-      if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
-      return cb(new Error("Not allowed by CORS"));
-    },
-    methods: ["GET", "POST", "OPTIONS"],
-    credentials: true,
-  })
-);
+app.use(cors(corsOptions));
+app.options("*", cors(corsOptions));
 
 app.get("/", (_req, res) => {
   res.json({ok: true, service: "ai-config-api"});
