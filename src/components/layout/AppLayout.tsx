@@ -2,21 +2,25 @@ import { ReactNode, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { AlignJustify, BarChart3, BookOpen, Bot, FileSpreadsheet, Layers3, ListTree, Map, Settings2 } from 'lucide-react';
 import clsx from 'clsx';
+import { useApiKey } from '../../hooks/useApiKey';
+import { ApiKeyDialog } from '../settings/ApiKeyDialog';
 
 const navigation = [
   { to: '/', label: 'Tổng quan', icon: BarChart3 },
   { to: '/tours', label: 'Tour nội bộ', icon: Map },
-  { to: '/ai', label: 'AI Extraction', icon: Bot },
-  { to: '/instructions', label: 'Prompt Builder', icon: BookOpen },
-  { to: '/schemas', label: 'Schema', icon: Layers3 },
-  { to: '/master-data', label: 'Master Data', icon: Settings2 },
-  { to: '/extractions', label: 'Extraction Log', icon: ListTree },
-  { to: '/reports', label: 'Xuất Excel', icon: FileSpreadsheet },
+  { to: '/ai', label: 'Trích xuất AI', icon: Bot },
+  { to: '/instructions', label: 'Trình tạo prompt', icon: BookOpen },
+  { to: '/schemas', label: 'Schema kiểm dữ liệu', icon: Layers3 },
+  { to: '/master-data', label: 'Dữ liệu chuẩn', icon: Settings2 },
+  { to: '/extractions', label: 'Nhật ký trích xuất', icon: ListTree },
+  { to: '/reports', label: 'Xuất báo cáo', icon: FileSpreadsheet },
 ];
 
 const AppLayout = ({ children }: { children: ReactNode }) => {
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [apiKeyDialogOpen, setApiKeyDialogOpen] = useState(false);
+  const { apiKey } = useApiKey();
 
   const activeItem = useMemo(() => {
     if (location.pathname === '/') return navigation[0];
@@ -36,7 +40,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
           <div className="flex items-center justify-between px-6 py-5 border-b border-slate-200">
             <div>
               <p className="text-sm font-semibold uppercase tracking-wide text-primary-600">Cursor Travel</p>
-              <p className="text-lg font-semibold text-slate-900">Tour Cost Console</p>
+              <p className="text-lg font-semibold text-slate-900">Bảng điều khiển chi phí tour</p>
             </div>
             <button
               type="button"
@@ -70,10 +74,11 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
               );
             })}
           </nav>
-          <div className="px-6 py-5 border-t border-slate-200 text-xs text-slate-500">
-            <p>Firebase Project: quantum-ratio-468010-d4</p>
-            <p>Environment: {import.meta.env.MODE}</p>
-            <p className="mt-2">© {new Date().getFullYear()} Cursor Travel Internal</p>
+          <div className="px-6 py-5 border-t border-slate-200 text-xs text-slate-500 space-y-1">
+            <p>Dự án Firebase: quantum-ratio-468010-d4</p>
+            <p>Môi trường: {import.meta.env.MODE}</p>
+            <p>API key Gemini: {apiKey ? 'đã thiết lập' : 'chưa thiết lập'}</p>
+            <p className="pt-1">© {new Date().getFullYear()} Cursor Travel Internal</p>
           </div>
         </aside>
         <div className="flex flex-col min-h-screen">
@@ -94,15 +99,29 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
                   </h1>
                 </div>
               </div>
-              <div className="hidden md:flex items-center gap-6 text-sm text-slate-500">
-                <div>
-                  <p className="font-medium text-slate-700">Gemini API</p>
-                  <p className="text-xs">Kết nối thông qua Cloud Functions</p>
+              <div className="flex flex-1 items-center justify-end gap-4 text-sm text-slate-500">
+                <div className="hidden md:flex items-center gap-6">
+                  <div>
+                    <p className="font-medium text-slate-700">Gemini API</p>
+                    <p className="text-xs">Kết nối qua Cloud Functions nội bộ</p>
+                  </div>
+                  <div>
+                    <p className="font-medium text-slate-700">Firestore</p>
+                    <p className="text-xs">Dữ liệu realtime đã chuẩn hóa</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="font-medium text-slate-700">Firestore</p>
-                  <p className="text-xs">Dữ liệu realtime &amp; chuẩn hóa</p>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setApiKeyDialogOpen(true)}
+                  className={clsx(
+                    'inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition',
+                    apiKey
+                      ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                      : 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100',
+                  )}
+                >
+                  {apiKey ? 'API key đã lưu' : 'Thiết lập API key'}
+                </button>
               </div>
             </div>
           </header>
@@ -111,6 +130,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
           </main>
         </div>
       </div>
+      <ApiKeyDialog open={apiKeyDialogOpen} onClose={() => setApiKeyDialogOpen(false)} />
     </div>
   );
 };

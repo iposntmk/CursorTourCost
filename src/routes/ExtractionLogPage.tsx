@@ -9,8 +9,8 @@ import dayjs from '../utils/dayjs';
 const ExtractionLogPage = () => {
   const { data, isLoading, isError } = useExtractionLog();
 
-  if (isLoading) return <LoadingState label="Đang tải lịch sử extraction..." />;
-  if (isError) return <ErrorState message="Không thể tải dữ liệu" />;
+  if (isLoading) return <LoadingState label="Đang tải nhật ký trích xuất..." />;
+  if (isError) return <ErrorState message="Không thể tải nhật ký trích xuất." />;
 
   return (
     <div className="space-y-6">
@@ -31,10 +31,10 @@ const ExtractionLogPage = () => {
               <table className="min-w-full divide-y divide-slate-200 text-sm">
                 <thead className="bg-slate-50">
                   <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
-                    <th className="px-4 py-3">Instruction</th>
-                    <th className="px-4 py-3">Schema</th>
-                    <th className="px-4 py-3">Rules</th>
-                    <th className="px-4 py-3">Valid</th>
+                    <th className="px-4 py-3">Hướng dẫn</th>
+                    <th className="px-4 py-3">Phiên bản schema</th>
+                    <th className="px-4 py-3">Quy tắc</th>
+                    <th className="px-4 py-3">Trạng thái</th>
                     <th className="px-4 py-3">Thời gian</th>
                   </tr>
                 </thead>
@@ -45,7 +45,9 @@ const ExtractionLogPage = () => {
                       <td className="px-4 py-3 text-slate-600">v{item.schemaVersion}</td>
                       <td className="px-4 py-3 text-slate-500">{item.ruleIds?.join(', ')}</td>
                       <td className="px-4 py-3">
-                        <StatusBadge status={item.valid ? 'valid' : 'invalid'}>{item.valid ? 'Valid' : 'Invalid'}</StatusBadge>
+                        <StatusBadge status={item.valid ? 'valid' : 'invalid'}>
+                          {item.valid ? 'Hợp lệ' : 'Không hợp lệ'}
+                        </StatusBadge>
                       </td>
                       <td className="px-4 py-3 text-slate-500">{item.createdAt ? dayjs(item.createdAt).format('DD/MM/YYYY HH:mm') : '—'}</td>
                     </tr>

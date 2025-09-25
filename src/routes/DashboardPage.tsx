@@ -56,21 +56,21 @@ const DashboardPage = () => {
         </Card>
         <Card>
           <CardContent>
-            <p className="text-xs font-semibold uppercase tracking-wide text-primary-600">Prompt Active</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary-600">Prompt đang dùng</p>
             <p className="mt-2 text-4xl font-bold text-slate-900">{publishedInstructions}</p>
-            <p className="mt-1 text-sm text-slate-500">Instruction đang active</p>
+            <p className="mt-1 text-sm text-slate-500">Hướng dẫn đang hoạt động</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent>
-            <p className="text-xs font-semibold uppercase tracking-wide text-primary-600">Schema Active</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary-600">Schema đang dùng</p>
             <p className="mt-2 text-4xl font-bold text-slate-900">{activeSchemaCount}</p>
-            <p className="mt-1 text-sm text-slate-500">Schema kiểm tra JSON đang sử dụng</p>
+            <p className="mt-1 text-sm text-slate-500">Schema kiểm tra JSON đang áp dụng</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent>
-            <p className="text-xs font-semibold uppercase tracking-wide text-primary-600">Extraction Valid</p>
+            <p className="text-xs font-semibold uppercase tracking-wide text-primary-600">Trích xuất hợp lệ</p>
             <p className="mt-2 text-4xl font-bold text-slate-900">{validExtractions}</p>
             <p className="mt-1 text-sm text-slate-500">/{totalExtractions} lần gọi Gemini thành công</p>
           </CardContent>
@@ -117,8 +117,8 @@ const DashboardPage = () => {
           <CardHeader>
             <CardTitle>
               <div>
-                <p className="text-sm font-semibold uppercase tracking-wide text-primary-600">Gemini Extraction</p>
-                <h2 className="text-xl font-semibold text-slate-900">Lịch sử gần đây</h2>
+                <p className="text-sm font-semibold uppercase tracking-wide text-primary-600">Trích xuất Gemini</p>
+                <h2 className="text-xl font-semibold text-slate-900">Nhật ký gần đây</h2>
               </div>
             </CardTitle>
           </CardHeader>
@@ -133,7 +133,7 @@ const DashboardPage = () => {
                         <p className="text-xs text-slate-500">Schema v{item.schemaVersion} • Prompt v{item.promptVersion}</p>
                       </div>
                       <StatusBadge status={item.valid ? 'valid' : 'invalid'}>
-                        {item.valid ? 'Valid' : 'Invalid'}
+                        {item.valid ? 'Hợp lệ' : 'Không hợp lệ'}
                       </StatusBadge>
                     </div>
                     <p className="mt-2 text-xs text-slate-500">{item.createdAt ? dayjs(item.createdAt).format('DD/MM/YYYY HH:mm') : '—'}</p>
@@ -141,7 +141,7 @@ const DashboardPage = () => {
                 ))}
               </div>
             ) : (
-              <EmptyState title="Chưa có lịch sử" description="Chạy thử quy trình AI Extraction để xem log." />
+              <EmptyState title="Chưa có lịch sử" description="Chạy thử quy trình trích xuất AI để xem nhật ký." />
             )}
           </CardContent>
         </Card>

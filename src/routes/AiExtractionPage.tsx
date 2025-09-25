@@ -9,12 +9,14 @@ import { useActiveSchema } from '../features/schemas/hooks/useSchemas';
 import { LoadingState } from '../components/common/LoadingState';
 import { ErrorState } from '../components/common/ErrorState';
 import { normalizeAiTour } from '../features/ai/utils';
-import { useTourDraft } from '../providers/TourDraftProvider';
+import { useTourDraft } from '../hooks/useTourDraft';
 import { TourData } from '../types/tour';
+import { useToast } from '../hooks/useToast';
 
 const AiExtractionPage = () => {
   const navigate = useNavigate();
   const { setDraft } = useTourDraft();
+  const { showToast } = useToast();
   const { data: schema, isLoading: loadingSchema, isError: schemaError } = useActiveSchema();
   const { data: promptData, isLoading: loadingPrompt, isError: promptError } = useQuery({
     queryKey: queryKeys.aiPrompt,
@@ -45,6 +47,7 @@ const AiExtractionPage = () => {
       setRawOutput(JSON.stringify(response.raw_output ?? response, null, 2));
       const parsed = response.parsed ?? response;
       setParsedJson(parsed);
+      showToast({ message: 'Đã gọi Gemini thành công.', type: 'success' });
 
       if (schemaObject) {
         const ajv = createAjvInstance();
@@ -60,6 +63,7 @@ const AiExtractionPage = () => {
     } catch (error) {
       setValidationResult(`Không thể gọi Gemini: ${(error as Error).message}`);
       setParsedJson(null);
+      showToast({ message: (error as Error).message || 'Không thể gọi Gemini.', type: 'error' });
     } finally {
       setIsLoading(false);
     }
@@ -69,6 +73,7 @@ const AiExtractionPage = () => {
     if (!parsedJson) return;
     const tour: TourData = normalizeAiTour(parsedJson);
     setDraft(tour);
+    showToast({ message: 'Đã nạp dữ liệu vào biểu mẫu tour.', type: 'success' });
     navigate('/tours/new');
   };
 
@@ -86,7 +91,7 @@ const AiExtractionPage = () => {
         <CardHeader>
           <CardTitle>
             <div>
-              <p className="text-sm font-semibold uppercase tracking-wide text-primary-600">Gemini Extraction</p>
+              <p className="text-sm font-semibold uppercase tracking-wide text-primary-600">Trích xuất Gemini</p>
               <h2 className="text-xl font-semibold text-slate-900">Nhận diện từ ảnh chương trình tour</h2>
             </div>
           </CardTitle>
@@ -104,7 +109,7 @@ const AiExtractionPage = () => {
               />
             </div>
             <div>
-              <label className="text-sm font-medium text-slate-700">Overrides (JSON optional)</label>
+              <label className="text-sm font-medium text-slate-700">Ghi đè (JSON tuỳ chọn)</label>
               <textarea
                 rows={4}
                 value={overrides}
@@ -126,7 +131,7 @@ const AiExtractionPage = () => {
                 }}
                 className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-primary-300 hover:text-primary-600"
               >
-                Reset
+                Làm mới
               </button>
               <button
                 type="submit"
@@ -145,7 +150,7 @@ const AiExtractionPage = () => {
           <CardTitle>
             <div>
               <p className="text-sm font-semibold uppercase tracking-wide text-primary-600">Prompt hiện tại</p>
-              <h2 className="text-xl font-semibold text-slate-900">Instruction & Schema</h2>
+              <h2 className="text-xl font-semibold text-slate-900">Hướng dẫn & Schema</h2>
             </div>
           </CardTitle>
         </CardHeader>
@@ -156,11 +161,11 @@ const AiExtractionPage = () => {
               <textarea readOnly rows={12} value={promptData?.prompt ?? ''} className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700" />
             </div>
             <div>
-              <p className="text-sm font-semibold text-slate-700">Schema đang active</p>
+              <p className="text-sm font-semibold text-slate-700">Schema đang dùng</p>
               <textarea
                 readOnly
                 rows={12}
-                value={schemaObject ? JSON.stringify(schemaObject, null, 2) : 'Chưa có schema active'}
+                value={schemaObject ? JSON.stringify(schemaObject, null, 2) : 'Chưa có schema đang dùng'}
                 className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700"
               />
             </div>
@@ -183,7 +188,7 @@ const AiExtractionPage = () => {
                 onClick={handleLoadToTour}
                 className="inline-flex items-center justify-center rounded-lg bg-primary-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-primary-500"
               >
-                Đưa vào form Tour
+                Đưa vào biểu mẫu tour
               </button>
             ) : null}
           </CardHeader>

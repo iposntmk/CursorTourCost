@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/common/C
 import { MASTER_DATA_CONFIGS, MASTER_DATA_TYPES, MasterDataField, MasterDataRecord, MasterDataType } from '../types/masterData';
 import { useMasterData } from '../features/master-data/hooks/useMasterData';
 import { useMasterDataMutations } from '../features/master-data/hooks/useMasterData';
+import { useToast } from '../hooks/useToast';
 import { LoadingState } from '../components/common/LoadingState';
 import { ErrorState } from '../components/common/ErrorState';
 import { EmptyState } from '../components/common/EmptyState';
@@ -69,6 +70,7 @@ const MasterDataPage = () => {
 
   const { data, isLoading, isError } = useMasterData(selectedType);
   const { create, update, remove } = useMasterDataMutations(selectedType);
+  const { showToast } = useToast();
 
   const config = MASTER_DATA_CONFIGS[selectedType];
 
@@ -92,13 +94,15 @@ const MasterDataPage = () => {
     try {
       if (editingId) {
         await update.mutateAsync({ id: editingId, data: payload });
+        showToast({ message: 'Đã cập nhật bản ghi thành công.', type: 'success' });
       } else {
         await create.mutateAsync(payload);
+        showToast({ message: 'Đã thêm bản ghi mới.', type: 'success' });
       }
       setFormData(createEmptyRecord(config.fields));
       setEditingId(null);
     } catch (error) {
-      window.alert((error as Error).message);
+      showToast({ message: (error as Error).message || 'Không thể lưu bản ghi.', type: 'error' });
     }
   };
 
@@ -108,8 +112,9 @@ const MasterDataPage = () => {
   };
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Xóa bản ghi này?')) return;
+    if (!window.confirm('Bạn có chắc chắn muốn xoá bản ghi này?')) return;
     await remove.mutateAsync(id);
+    showToast({ message: 'Đã xoá bản ghi.', type: 'info' });
   };
 
   const handleBulkImport = async () => {
@@ -128,7 +133,7 @@ const MasterDataPage = () => {
       await create.mutateAsync(payload);
     }
     setBulkText('');
-    window.alert('Import thành công');
+    showToast({ message: 'Đã nhập dữ liệu hàng loạt.', type: 'success' });
   };
 
   const handleCsvImport = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -141,7 +146,10 @@ const MasterDataPage = () => {
           if (!row.name) continue;
           await create.mutateAsync(row);
         }
-        window.alert('Import CSV thành công');
+        showToast({ message: 'Đã nhập CSV thành công.', type: 'success' });
+      },
+      error: (error) => {
+        showToast({ message: error.message ?? 'Không thể đọc file CSV.', type: 'error' });
       },
     });
   };
@@ -161,7 +169,7 @@ const MasterDataPage = () => {
         <CardHeader>
           <CardTitle>
             <div>
-              <p className="text-sm font-semibold uppercase tracking-wide text-primary-600">Master Data</p>
+              <p className="text-sm font-semibold uppercase tracking-wide text-primary-600">Dữ liệu chuẩn</p>
               <h2 className="text-xl font-semibold text-slate-900">Danh mục dữ liệu chuẩn</h2>
             </div>
           </CardTitle>
@@ -203,7 +211,7 @@ const MasterDataPage = () => {
               Xuất CSV
             </button>
             <label className="inline-flex cursor-pointer items-center justify-center rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-primary-300 hover:text-primary-600">
-              Import CSV
+              Nhập CSV
               <input type="file" accept=".csv" className="hidden" onChange={handleCsvImport} />
             </label>
           </div>
@@ -221,7 +229,7 @@ const MasterDataPage = () => {
                   }}
                   className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-primary-300 hover:text-primary-600"
                 >
-                  Hủy
+                  Huỷ
                 </button>
               ) : null}
               <button

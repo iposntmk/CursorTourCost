@@ -6,7 +6,8 @@ import { LoadingState } from '../components/common/LoadingState';
 import { ErrorState } from '../components/common/ErrorState';
 import { calculateCostTotals } from '../features/tours/utils';
 import { EmptyState } from '../components/common/EmptyState';
-import { TourData } from '../types/tour';
+import { ChiPhiItem, TourData } from '../types/tour';
+import { useToast } from '../hooks/useToast';
 
 const buildTourSheet = (sheet: ExcelJS.Worksheet, tour: TourData) => {
   sheet.addRow(['Mã tour', tour.thong_tin_chung.ma_tour]);
@@ -17,7 +18,7 @@ const buildTourSheet = (sheet: ExcelJS.Worksheet, tour: TourData) => {
   sheet.addRow([]);
   sheet.addRow(['Chi phí']);
   sheet.addRow(['Ngày', 'Loại', 'Tên', 'Số lượng', 'Đơn giá', 'Thành tiền']);
-  tour.danh_sach_chi_phi.forEach((item: any) =>
+  tour.danh_sach_chi_phi.forEach((item: ChiPhiItem) =>
     sheet.addRow([item.ngay, item.loai, item.ten, item.so_luong, item.don_gia, item.thanh_tien]),
   );
   const totals = calculateCostTotals(tour);
@@ -27,10 +28,11 @@ const buildTourSheet = (sheet: ExcelJS.Worksheet, tour: TourData) => {
 
 const ReportsPage = () => {
   const { data, isLoading, isError } = useTours();
+  const { showToast } = useToast();
 
   const exportAllTours = async () => {
     if (!data || data.length === 0) {
-      window.alert('Không có tour để xuất');
+      showToast({ message: 'Không có tour để xuất.', type: 'info' });
       return;
     }
     const workbook = new ExcelJS.Workbook();
