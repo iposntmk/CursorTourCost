@@ -17,7 +17,6 @@ import { normalizeAiTour } from '../features/ai/utils';
 import { useTourDraft } from '../hooks/useTourDraft';
 import { TourData } from '../types/tour';
 import { useToast } from '../hooks/useToast';
-import clsx from 'clsx';
 
 const AiExtractionPage = () => {
   const navigate = useNavigate();
@@ -47,7 +46,6 @@ const AiExtractionPage = () => {
     isError: activeRulesError,
   } = useInstructionRuleSets(activeInstructionIds);
 
-  const [imageUrl, setImageUrl] = useState('');
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
   const [overrides, setOverrides] = useState('');
@@ -56,7 +54,6 @@ const AiExtractionPage = () => {
   const [validationResult, setValidationResult] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [showValidation, setShowValidation] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -92,8 +89,6 @@ const AiExtractionPage = () => {
 
     setFileError(null);
     setUploadedFile(file);
-    setImageUrl('');
-    setShowValidation(false);
     event.target.value = '';
   };
 
@@ -169,31 +164,25 @@ const AiExtractionPage = () => {
     setIsLoading(true);
     setValidationResult(null);
     setValidationErrors([]);
-    const trimmedImageUrl = imageUrl.trim();
-    const hasImageSource = Boolean(uploadedFile || trimmedImageUrl);
-    if (!hasImageSource) {
-      setShowValidation(true);
+    
+    if (!uploadedFile) {
       showToast({
-        message: 'Vui lòng cung cấp đường dẫn hoặc tải lên ảnh chương trình tour.',
+        message: 'Vui lòng tải lên ảnh chương trình tour.',
         type: 'error',
       });
       setIsLoading(false);
       return;
     }
+    
     try {
       const overridesPayload = overrides ? JSON.parse(overrides) : undefined;
-      let response;
-      if (uploadedFile) {
-        const base64Data = await readFileAsBase64(uploadedFile);
-        response = await requestAiExtraction({
-          imageBase64: base64Data,
-          imageMimeType: uploadedFile.type,
-          imageName: uploadedFile.name,
-          overrides: overridesPayload,
-        });
-      } else {
-        response = await requestAiExtraction({ imageUrl: trimmedImageUrl, overrides: overridesPayload });
-      }
+      const base64Data = await readFileAsBase64(uploadedFile);
+      const response = await requestAiExtraction({
+        imageBase64: base64Data,
+        imageMimeType: uploadedFile.type,
+        imageName: uploadedFile.name,
+        overrides: overridesPayload,
+      });
       setRawOutput(JSON.stringify(response.raw_output ?? response, null, 2));
       const parsed = response.parsed ?? response;
       setParsedJson(parsed);
@@ -269,68 +258,45 @@ const AiExtractionPage = () => {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="text-sm font-medium text-slate-700">Tải ảnh chương trình tour</label>
-                <p className="mt-1 text-xs text-slate-500">
-                  Chọn tập tin hình ảnh từ máy tính để gửi trực tiếp tới Gemini. Ảnh chỉ dùng tạm thời và không được lưu trữ.
-                </p>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  className="mt-1 block w-full cursor-pointer text-sm text-slate-600 file:mr-4 file:rounded-md file:border file:border-slate-200 file:bg-white file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-700 hover:file:border-primary-300 hover:file:text-primary-600"
-                />
-                {fileError ? <p className="mt-2 text-xs text-red-500">{fileError}</p> : null}
-                {showValidation && !uploadedFile && !imageUrl.trim() ? (
-                  <p className="mt-2 text-xs text-red-500">Vui lòng chọn ảnh hoặc nhập đường dẫn.</p>
-                ) : null}
-                {uploadedFile ? (
-                  <div className="mt-3 flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                    {filePreviewUrl ? (
-                      <img
-                        src={filePreviewUrl}
-                        alt={uploadedFile.name}
-                        className="h-16 w-16 rounded-md object-cover"
-                      />
-                    ) : null}
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-slate-700">{uploadedFile.name}</p>
-                      <p className="text-xs text-slate-500">
-                        {(uploadedFile.size / 1024).toFixed(1)} KB · {uploadedFile.type || 'Không rõ định dạng'}
-                      </p>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setUploadedFile(null);
-                          setFilePreviewUrl(null);
-                        }}
-                        className="mt-2 text-xs font-medium text-primary-600 hover:underline"
-                      >
-                        Xoá ảnh đã chọn
-                      </button>
-                    </div>
+            <div>
+              <label className="text-sm font-medium text-slate-700">Tải ảnh chương trình tour</label>
+              <p className="mt-1 text-xs text-slate-500">
+                Chọn tập tin hình ảnh từ máy tính để gửi trực tiếp tới Gemini. Ảnh chỉ dùng tạm thời và không được lưu trữ.
+              </p>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="mt-1 block w-full cursor-pointer text-sm text-slate-600 file:mr-4 file:rounded-md file:border file:border-slate-200 file:bg-white file:px-3 file:py-2 file:text-sm file:font-medium file:text-slate-700 hover:file:border-primary-300 hover:file:text-primary-600"
+              />
+              {fileError ? <p className="mt-2 text-xs text-red-500">{fileError}</p> : null}
+              {uploadedFile ? (
+                <div className="mt-3 flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  {filePreviewUrl ? (
+                    <img
+                      src={filePreviewUrl}
+                      alt={uploadedFile.name}
+                      className="h-16 w-16 rounded-md object-cover"
+                    />
+                  ) : null}
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-slate-700">{uploadedFile.name}</p>
+                    <p className="text-xs text-slate-500">
+                      {(uploadedFile.size / 1024).toFixed(1)} KB · {uploadedFile.type || 'Không rõ định dạng'}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUploadedFile(null);
+                        setFilePreviewUrl(null);
+                      }}
+                      className="mt-2 text-xs font-medium text-primary-600 hover:underline"
+                    >
+                      Xoá ảnh đã chọn
+                    </button>
                   </div>
-                ) : null}
-              </div>
-              <div>
-                <label className="text-sm font-medium text-slate-700">Link ảnh chương trình tour</label>
-                <p className="mt-1 text-xs text-slate-500">
-                  Dán đường dẫn trực tiếp tới ảnh lịch trình. Bạn có thể bỏ trống nếu đã tải ảnh lên.
-                </p>
-                <input
-                  value={imageUrl}
-                  onChange={(event) => setImageUrl(event.target.value)}
-                  placeholder="https://..."
-                  onBlur={() => setShowValidation(true)}
-                  className={clsx(
-                    'mt-1 w-full rounded-lg border px-3 py-2 text-sm focus:ring-0',
-                    showValidation && !uploadedFile && !imageUrl.trim()
-                      ? 'border-red-300 focus:border-red-400 focus:ring-red-100 bg-red-50/40'
-                      : 'border-slate-200 focus:border-primary-400',
-                  )}
-                />
-              </div>
+                </div>
+              ) : null}
             </div>
             <div>
               <label className="text-sm font-medium text-slate-700">Ghi đè (JSON tuỳ chọn)</label>
@@ -349,7 +315,6 @@ const AiExtractionPage = () => {
               <button
                 type="button"
                 onClick={() => {
-                  setImageUrl('');
                   setUploadedFile(null);
                   setFilePreviewUrl(null);
                   setOverrides('');
@@ -357,7 +322,6 @@ const AiExtractionPage = () => {
                   setParsedJson(null);
                   setValidationErrors([]);
                   setValidationResult(null);
-                  setShowValidation(false);
                   setFileError(null);
                 }}
                 className="inline-flex items-center justify-center rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:border-primary-300 hover:text-primary-600"
