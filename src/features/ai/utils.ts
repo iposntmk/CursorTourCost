@@ -3,10 +3,70 @@ import { TourData, createEmptyTour } from '../../types/tour';
 
 const ensureString = (value: unknown) => (typeof value === 'string' ? value : '');
 
+const parseTextResponse = (text: string): TourData => {
+  const base = createEmptyTour();
+  
+  // Extract data from markdown-like text format
+  const extractValue = (pattern: RegExp): string => {
+    const match = text.match(pattern);
+    return match ? match[1].trim() : '';
+  };
+  
+  // Parse various field patterns
+  const maTour = extractValue(/\*\*ma_tour:\*\*\s*([^\n*]+)/i) || 
+                 extractValue(/ma_tour[:\s]+([^\n*]+)/i) ||
+                 extractValue(/LIV[-\s]+NITAY[-\s]*(\d+)/i);
+  
+  const guideName = extractValue(/\*\*guidename:\*\*\s*([^\n*]+)/i) ||
+                   extractValue(/guide[:\s]+([^\n*]+)/i);
+  
+  const startDate = extractValue(/\*\*ngay_bat_dau:\*\*\s*([^\n*]+)/i) ||
+                   extractValue(/start[:\s]+([^\n*]+)/i);
+  
+  const endDate = extractValue(/\*\*enddate:\*\*\s*([^\n*]+)/i) ||
+                 extractValue(/end[:\s]+([^\n*]+)/i);
+  
+  const nationality = extractValue(/\*\*nationality:\*\*\s*([^\n*]+)/i) ||
+                     extractValue(/nationality[:\s]+([^\n*]+)/i);
+  
+  // Convert date format if needed (DD/MM/YYYY to YYYY-MM-DD)
+  const formatDate = (dateStr: string): string => {
+    if (!dateStr) return '';
+    // Handle DD/MM/YYYY format
+    const ddmmyyyy = dateStr.match(/(\d{2})\/(\d{2})\/(\d{4})/);
+    if (ddmmyyyy) {
+      const [, day, month, year] = ddmmyyyy;
+      return `${year}-${month}-${day}`;
+    }
+    return dateStr;
+  };
+  
+  // Populate the base structure
+  base.thong_tin_chung.ma_tour = maTour;
+  base.thong_tin_chung.ten_guide = guideName;
+  base.thong_tin_chung.quoc_tich_khach = nationality;
+  base.ngay_bat_dau = formatDate(startDate);
+  base.ngay_ket_thuc = formatDate(endDate);
+  
+  return base;
+};
+
 export const normalizeAiTour = (raw: unknown): TourData => {
   const base = createEmptyTour();
-  if (!raw || typeof raw !== 'object') return base;
+  if (!raw) return base;
+  
+  // Handle case where Gemini returns text instead of structured JSON
+  if (typeof raw === 'string') {
+    return parseTextResponse(raw);
+  }
+  
+  if (typeof raw !== 'object') return base;
   const source = raw as Record<string, unknown>;
+  
+  // Handle case where Gemini returns { extractedText: "..." }
+  if (source.extractedText && typeof source.extractedText === 'string') {
+    return parseTextResponse(source.extractedText);
+  }
 
   const thongTinChung = source.thong_tin_chung as Record<string, unknown> | undefined;
 
