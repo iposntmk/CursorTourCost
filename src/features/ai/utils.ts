@@ -6,6 +6,20 @@ const ensureString = (value: unknown) => (typeof value === 'string' ? value : ''
 const parseTextResponse = (text: string): TourData => {
   const base = createEmptyTour();
   
+  // Try to extract JSON from markdown code block first
+  const jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/i);
+  if (jsonMatch) {
+    try {
+      const jsonStr = jsonMatch[1].trim();
+      const parsedJson = JSON.parse(jsonStr);
+      // If we successfully parsed JSON, use the existing logic for JSON objects
+      return normalizeAiTour(parsedJson);
+    } catch (error) {
+      console.warn('Failed to parse JSON from markdown block:', error);
+      // Fall through to text parsing
+    }
+  }
+  
   // Extract data from markdown-like text format
   const extractValue = (pattern: RegExp): string => {
     const match = text.match(pattern);
