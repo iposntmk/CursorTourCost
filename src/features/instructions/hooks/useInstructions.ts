@@ -19,6 +19,12 @@ const mapInstruction = (item: Instruction & { id: string }) => ({
   publishedAt: timestampToISO((item as unknown as { publishedAt?: unknown }).publishedAt) ?? undefined,
 });
 
+const fetchActiveInstructions = async () => {
+  const docs = await listDocuments<Instruction>(COLLECTION, 'updatedAt');
+  const actives = docs.filter((item) => item.status === 'active');
+  return actives.map((instruction) => mapInstruction(instruction as Instruction & { id: string }));
+};
+
 export const useInstructions = () =>
   useQuery({
     queryKey: queryKeys.instructions,
@@ -32,10 +38,15 @@ export const useActiveInstruction = () =>
   useQuery({
     queryKey: queryKeys.activeInstruction,
     queryFn: async () => {
-      const docs = await listDocuments<Instruction>(COLLECTION, 'updatedAt');
-      const active = docs.find((item) => item.status === 'active');
-      return active ? mapInstruction(active as Instruction & { id: string }) : null;
+      const actives = await fetchActiveInstructions();
+      return actives[0] ?? null;
     },
+  });
+
+export const useActiveInstructions = () =>
+  useQuery({
+    queryKey: queryKeys.activeInstructions,
+    queryFn: fetchActiveInstructions,
   });
 
 export const useInstruction = (id?: string) =>
@@ -49,16 +60,40 @@ export const useInstruction = (id?: string) =>
     },
   });
 
-export const useInstructionRules = (instructionId?: string) =>
-  useQuery({
-    queryKey: instructionId ? queryKeys.instructionRules(instructionId) : ['instruction', 'rules', 'empty'],
-    enabled: Boolean(instructionId),
+export const useInstructionRuleSets = (instructionIds?: string[]) => {
+  const normalizedIds = [...(instructionIds ?? [])]
+    .filter((id): id is string => Boolean(id))
+    .sort();
+
+  return useQuery({
+    queryKey: normalizedIds.length
+      ? queryKeys.instructionRuleSets(normalizedIds)
+      : ['instruction', 'rules', 'set', 'empty'],
+    enabled: normalizedIds.length > 0,
+    initialData: {} as Record<string, InstructionRule[]>,
     queryFn: async () => {
-      if (!instructionId) return [];
-      const docs = await listDocuments<InstructionRule>(`${COLLECTION}/${instructionId}/rules`, 'priority');
-      return docs.sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0));
+      if (!normalizedIds.length) return {} as Record<string, InstructionRule[]>;
+
+      const entries = await Promise.all(
+        normalizedIds.map(async (instructionId) => {
+          const docs = await listDocuments<InstructionRule>(`${COLLECTION}/${instructionId}/rules`, 'priority');
+          const sorted = docs.sort((a, b) => (a.priority ?? 0) - (b.priority ?? 0));
+          return [instructionId, sorted] as const;
+        }),
+      );
+
+      return Object.fromEntries(entries) as Record<string, InstructionRule[]>;
     },
   });
+};
+
+export const useInstructionRules = (instructionId?: string) => {
+  const query = useInstructionRuleSets(instructionId ? [instructionId] : []);
+  return {
+    ...query,
+    data: instructionId ? query.data?.[instructionId] ?? [] : [],
+  };
+};
 
 export const useInstructionExamples = (instructionId?: string, ruleId?: string) =>
   useQuery({
@@ -79,7 +114,11 @@ export const useInstructionMutations = () => {
 
   const createInstruction = useMutation({
     mutationFn: (payload: Instruction) => addDocument(COLLECTION, payload),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.instructions }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.instructions });
+      queryClient.invalidateQueries({ queryKey: queryKeys.activeInstruction });
+      queryClient.invalidateQueries({ queryKey: queryKeys.activeInstructions });
+    },
   });
 
   const updateInstruction = useMutation({
@@ -87,6 +126,8 @@ export const useInstructionMutations = () => {
       updateDocument(`${COLLECTION}/${id}`, data),
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.instructions });
+      queryClient.invalidateQueries({ queryKey: queryKeys.activeInstruction });
+      queryClient.invalidateQueries({ queryKey: queryKeys.activeInstructions });
       queryClient.invalidateQueries({ queryKey: queryKeys.instruction(id) });
     },
   });
@@ -95,13 +136,19 @@ export const useInstructionMutations = () => {
     mutationFn: ({ id, data }: { id: string; data: Instruction }) => setDocument(`${COLLECTION}/${id}`, data),
     onSuccess: (_, { id }) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.instructions });
+      queryClient.invalidateQueries({ queryKey: queryKeys.activeInstruction });
+      queryClient.invalidateQueries({ queryKey: queryKeys.activeInstructions });
       queryClient.invalidateQueries({ queryKey: queryKeys.instruction(id) });
     },
   });
 
   const deleteInstruction = useMutation({
     mutationFn: (id: string) => removeDocument(`${COLLECTION}/${id}`),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: queryKeys.instructions }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.instructions });
+      queryClient.invalidateQueries({ queryKey: queryKeys.activeInstruction });
+      queryClient.invalidateQueries({ queryKey: queryKeys.activeInstructions });
+    },
   });
 
   const upsertRule = useMutation({
@@ -114,6 +161,7 @@ export const useInstructionMutations = () => {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.instructionRules(variables.instructionId) });
+      queryClient.invalidateQueries({ queryKey: ['instruction', 'rules', 'set'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.instructions });
     },
   });
@@ -123,6 +171,7 @@ export const useInstructionMutations = () => {
       removeDocument(`${COLLECTION}/${instructionId}/rules/${ruleId}`),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.instructionRules(variables.instructionId) });
+      queryClient.invalidateQueries({ queryKey: ['instruction', 'rules', 'set'] });
     },
   });
 
@@ -154,6 +203,7 @@ export const useInstructionMutations = () => {
       removeDocument(`${COLLECTION}/${instructionId}/rules/${ruleId}/examples/${exampleId}`),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.instructionExamples(variables.instructionId, variables.ruleId) });
+      queryClient.invalidateQueries({ queryKey: ['instruction', 'rules', 'set'] });
     },
   });
 
