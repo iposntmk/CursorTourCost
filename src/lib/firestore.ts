@@ -21,6 +21,11 @@ const toPathSegments = (path: PathArgs): string[] => {
   return path.split('/').filter(Boolean);
 };
 
+const omitUndefined = <T extends Record<string, unknown>>(data: T) => {
+  const entries = Object.entries(data).filter(([, value]) => value !== undefined);
+  return Object.fromEntries(entries) as T;
+};
+
 export const collectionFromPath = (path: PathArgs) => {
   const segments = toPathSegments(path);
   return collection(db, segments.join('/'));
@@ -47,8 +52,9 @@ export const getDocument = async <T = unknown>(path: PathArgs) => {
 
 export const addDocument = async <T extends Record<string, unknown>>(path: PathArgs, data: T) => {
   const ref = collectionFromPath(path);
+  const payload = omitUndefined(data);
   const created = await addDoc(ref, {
-    ...data,
+    ...payload,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
@@ -57,10 +63,11 @@ export const addDocument = async <T extends Record<string, unknown>>(path: PathA
 
 export const setDocument = async <T extends Record<string, unknown>>(path: PathArgs, data: T) => {
   const ref = docFromPath(path);
+  const payload = omitUndefined(data);
   await setDoc(
     ref,
     {
-      ...data,
+      ...payload,
       updatedAt: serverTimestamp(),
     },
     { merge: true },
@@ -69,8 +76,9 @@ export const setDocument = async <T extends Record<string, unknown>>(path: PathA
 
 export const updateDocument = async <T extends Record<string, unknown>>(path: PathArgs, data: Partial<T>) => {
   const ref = docFromPath(path);
+  const payload = omitUndefined(data as Record<string, unknown>);
   await updateDoc(ref, {
-    ...data,
+    ...payload,
     updatedAt: serverTimestamp(),
   });
 };
