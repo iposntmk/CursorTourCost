@@ -1,4 +1,4 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/common/Card';
 import { useSchemas, useSchemaMutations } from '../features/schemas/hooks/useSchemas';
 import { createAjvInstance, formatAjvErrors } from '../lib/ajv';
@@ -6,6 +6,7 @@ import { PromptSchema, SchemaStatus } from '../types/schema';
 import { LoadingState } from '../components/common/LoadingState';
 import { ErrorState } from '../components/common/ErrorState';
 import { EmptyState } from '../components/common/EmptyState';
+import { useToast } from '../hooks/useToast';
 
 const SchemaEditorPage = () => {
   const { data, isLoading, isError } = useSchemas();
@@ -16,6 +17,16 @@ const SchemaEditorPage = () => {
   const [validationResult, setValidationResult] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const { showToast } = useToast();
+
+  const statusLabel = useMemo<Record<SchemaStatus, string>>(
+    () => ({
+      draft: 'Nháp',
+      active: 'Đang dùng',
+      archived: 'Lưu trữ',
+    }),
+    [],
+  );
 
   const resetEditor = () => {
     setEditor(null);
@@ -43,8 +54,10 @@ const SchemaEditorPage = () => {
         status: editor?.status ?? 'draft',
       } as PromptSchema);
       resetEditor();
+      showToast({ message: 'Đã tạo schema mới.', type: 'success' });
     } catch (error) {
       setValidationResult(`Không thể tạo schema: ${(error as Error).message}`);
+      showToast({ message: (error as Error).message || 'Không thể tạo schema.', type: 'error' });
     } finally {
       setIsSaving(false);
     }
@@ -64,8 +77,10 @@ const SchemaEditorPage = () => {
         },
       });
       setValidationResult('Cập nhật schema thành công');
+      showToast({ message: 'Đã cập nhật schema.', type: 'success' });
     } catch (error) {
       setValidationResult(`Không thể cập nhật schema: ${(error as Error).message}`);
+      showToast({ message: (error as Error).message || 'Không thể cập nhật schema.', type: 'error' });
     } finally {
       setIsSaving(false);
     }
@@ -91,8 +106,8 @@ const SchemaEditorPage = () => {
     }
   };
 
-  if (isLoading) return <LoadingState label="Đang tải schemas..." />;
-  if (isError) return <ErrorState message="Không tải được danh sách schema" />;
+  if (isLoading) return <LoadingState label="Đang tải danh sách schema..." />;
+  if (isError) return <ErrorState message="Không thể tải danh sách schema." />;
 
   return (
     <div className="space-y-6">
@@ -100,7 +115,7 @@ const SchemaEditorPage = () => {
         <CardHeader>
           <CardTitle>
             <div>
-              <p className="text-sm font-semibold uppercase tracking-wide text-primary-600">Schemas</p>
+              <p className="text-sm font-semibold uppercase tracking-wide text-primary-600">Schema</p>
               <h2 className="text-xl font-semibold text-slate-900">Danh sách schema</h2>
             </div>
           </CardTitle>
@@ -125,7 +140,7 @@ const SchemaEditorPage = () => {
                 <thead className="bg-slate-50">
                   <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
                     <th className="px-4 py-3">Tên</th>
-                    <th className="px-4 py-3">Version</th>
+                    <th className="px-4 py-3">Phiên bản</th>
                     <th className="px-4 py-3">Trạng thái</th>
                     <th className="px-4 py-3">Cập nhật</th>
                     <th className="px-4 py-3" />
@@ -144,7 +159,7 @@ const SchemaEditorPage = () => {
                               : 'border-slate-200 bg-slate-50 text-slate-600'
                           }`}
                         >
-                          {schema.status}
+                          {statusLabel[schema.status]}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-slate-500">{schema.updatedAt?.substring(0, 10) ?? '—'}</td>
@@ -160,15 +175,16 @@ const SchemaEditorPage = () => {
                           {schema.status !== 'active' ? (
                             <button
                               type="button"
-                              onClick={() =>
-                                updateSchema.mutateAsync({
+                              onClick={async () => {
+                                await updateSchema.mutateAsync({
                                   id: schema.id!,
                                   data: { ...schema, status: 'active' satisfies SchemaStatus },
-                                })
-                              }
+                                });
+                                showToast({ message: `Đã kích hoạt ${schema.name}.`, type: 'success' });
+                              }}
                               className="inline-flex items-center justify-center rounded-lg border border-emerald-200 px-3 py-1 text-xs font-semibold text-emerald-600 transition hover:bg-emerald-50"
                             >
-                              Set active
+                              Kích hoạt
                             </button>
                           ) : null}
                         </div>
@@ -187,7 +203,7 @@ const SchemaEditorPage = () => {
           <CardHeader>
             <CardTitle>
               <div>
-                <p className="text-sm font-semibold uppercase tracking-wide text-primary-600">Schema editor</p>
+                <p className="text-sm font-semibold uppercase tracking-wide text-primary-600">Chỉnh sửa schema</p>
                 <h2 className="text-xl font-semibold text-slate-900">{editor.name}</h2>
               </div>
             </CardTitle>

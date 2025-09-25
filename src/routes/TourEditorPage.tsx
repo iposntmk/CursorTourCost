@@ -3,9 +3,8 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { TourForm } from '../features/tours/components/TourForm';
 import { TourData, createEmptyTour } from '../types/tour';
 import { useTour, useTourMutations } from '../features/tours/hooks/useTours';
-import { useMasterData } from '../features/master-data/hooks/useMasterData';
 import { MasterDataRecord, MasterDataType } from '../types/masterData';
-import { useTourDraft } from '../providers/TourDraftProvider';
+import { useTourDraft } from '../hooks/useTourDraft';
 import { useActiveSchema } from '../features/schemas/hooks/useSchemas';
 import { createAjvInstance, formatAjvErrors } from '../lib/ajv';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/common/Card';
@@ -15,17 +14,8 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import { calculateCostTotals } from '../features/tours/utils';
 import { ButtonHTMLAttributes } from 'react';
-
-const useMasterDataCollections = (types: MasterDataType[]) => {
-  const entries = types.map((type) => ({ type, query: useMasterData(type) }));
-  const loading = entries.some((entry) => entry.query.isLoading);
-  const error = entries.some((entry) => entry.query.isError);
-  const data: Partial<Record<MasterDataType, MasterDataRecord[]>> = {};
-  entries.forEach((entry) => {
-    if (entry.query.data) data[entry.type] = entry.query.data;
-  });
-  return { data, loading, error };
-};
+import { useMasterData } from '../features/master-data/hooks/useMasterData';
+import { useToast } from '../hooks/useToast';
 
 const PrimaryButton = ({ className = '', ...props }: ButtonHTMLAttributes<HTMLButtonElement>) => (
   <button
@@ -49,17 +39,59 @@ const TourEditorPage = () => {
   const { create, update } = useTourMutations();
   const { draft, resetDraft } = useTourDraft();
   const { data: schema } = useActiveSchema();
+  const { showToast } = useToast();
 
   const [tour, setTour] = useState<TourData>(createEmptyTour());
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [schemaError, setSchemaError] = useState<string | null>(null);
 
-  const masterDataTypes: MasterDataType[] = useMemo(
-    () => ['guides', 'companies', 'nationalities', 'provinces', 'locations', 'cost_types', 'cost_items'],
-    [],
+  const guidesQuery = useMasterData('guides');
+  const companiesQuery = useMasterData('companies');
+  const nationalitiesQuery = useMasterData('nationalities');
+  const provincesQuery = useMasterData('provinces');
+  const locationsQuery = useMasterData('locations');
+  const costTypesQuery = useMasterData('cost_types');
+  const costItemsQuery = useMasterData('cost_items');
+
+  const masterData: Partial<Record<MasterDataType, MasterDataRecord[]>> = useMemo(
+    () => ({
+      guides: guidesQuery.data ?? [],
+      companies: companiesQuery.data ?? [],
+      nationalities: nationalitiesQuery.data ?? [],
+      provinces: provincesQuery.data ?? [],
+      locations: locationsQuery.data ?? [],
+      cost_types: costTypesQuery.data ?? [],
+      cost_items: costItemsQuery.data ?? [],
+    }),
+    [
+      guidesQuery.data,
+      companiesQuery.data,
+      nationalitiesQuery.data,
+      provincesQuery.data,
+      locationsQuery.data,
+      costTypesQuery.data,
+      costItemsQuery.data,
+    ],
   );
-  const { data: masterData, loading: loadingMasterData, error: masterDataError } = useMasterDataCollections(masterDataTypes);
+
+  const loadingMasterData =
+    guidesQuery.isLoading ||
+    companiesQuery.isLoading ||
+    nationalitiesQuery.isLoading ||
+    provincesQuery.isLoading ||
+    locationsQuery.isLoading ||
+    costTypesQuery.isLoading ||
+    costItemsQuery.isLoading;
+
+  const masterDataError =
+    guidesQuery.isError ||
+    companiesQuery.isError ||
+    nationalitiesQuery.isError ||
+    provincesQuery.isError ||
+    locationsQuery.isError ||
+    costTypesQuery.isError ||
+    costItemsQuery.isError;
 
   useEffect(() => {
     if (existingTour) {
@@ -105,10 +137,11 @@ const TourEditorPage = () => {
         await create.mutateAsync(tour);
         resetDraft();
       }
-      window.alert('Lưu tour thành công');
+      showToast({ message: 'Đã lưu tour thành công.', type: 'success' });
       navigate('/tours');
     } catch (error) {
       setSchemaError((error as Error).message);
+      showToast({ message: (error as Error).message || 'Không thể lưu tour.', type: 'error' });
     } finally {
       setIsSaving(false);
     }
@@ -222,7 +255,7 @@ const TourEditorPage = () => {
           <div className="flex flex-wrap items-center gap-3">
             {!isEditing && draft ? (
               <SecondaryButton type="button" onClick={handleResetDraft}>
-                Xóa dữ liệu AI
+                Xoá dữ liệu AI
               </SecondaryButton>
             ) : null}
             <SecondaryButton type="button" onClick={handleExportExcel}>

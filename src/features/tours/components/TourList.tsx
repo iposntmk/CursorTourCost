@@ -13,7 +13,7 @@ export const TourList = () => {
   const { remove } = useTourMutations();
 
   const handleDelete = async (id: string) => {
-    if (!window.confirm('Bạn có chắc chắn muốn xóa tour này?')) return;
+    if (!window.confirm('Bạn có chắc chắn muốn xoá tour này?')) return;
     await remove.mutateAsync(id);
   };
 
@@ -79,7 +79,7 @@ export const TourList = () => {
                             onClick={() => tour.id && handleDelete(tour.id)}
                             className="inline-flex items-center gap-1 rounded-md border border-red-200 px-3 py-1 text-xs font-semibold text-red-500 hover:bg-red-50"
                           >
-                            <Trash2 className="h-4 w-4" /> Xóa
+                            <Trash2 className="h-4 w-4" /> Xoá
                           </button>
                         </div>
                       </td>
