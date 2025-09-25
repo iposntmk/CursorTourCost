@@ -6,6 +6,8 @@ import { queryKeys } from '../constants/queryKeys';
 import { fetchLatestPrompt, requestAiExtraction } from '../features/ai/api';
 import { createAjvInstance, formatAjvErrors } from '../lib/ajv';
 import { useActiveSchema } from '../features/schemas/hooks/useSchemas';
+import { useActiveInstruction, useInstructionRules } from '../features/instructions/hooks/useInstructions';
+import { composePrompt } from '../features/instructions/utils/composePrompt';
 import { LoadingState } from '../components/common/LoadingState';
 import { ErrorState } from '../components/common/ErrorState';
 import { normalizeAiTour } from '../features/ai/utils';
@@ -23,6 +25,16 @@ const AiExtractionPage = () => {
     queryKey: queryKeys.aiPrompt,
     queryFn: fetchLatestPrompt,
   });
+  const {
+    data: activeInstruction,
+    isLoading: loadingActiveInstruction,
+    isError: activeInstructionError,
+  } = useActiveInstruction();
+  const {
+    data: activeRules,
+    isLoading: loadingActiveRules,
+    isError: activeRulesError,
+  } = useInstructionRules(activeInstruction?.id);
 
   const [imageUrl, setImageUrl] = useState('');
   const [overrides, setOverrides] = useState('');
@@ -85,11 +97,24 @@ const AiExtractionPage = () => {
     navigate('/tours/new');
   };
 
-  if (loadingSchema || loadingPrompt) {
+  const shouldUseFallbackPrompt = !(promptData?.prompt && promptData.prompt.trim().length > 0);
+  const fallbackPrompt = useMemo(
+    () => composePrompt(activeInstruction, activeRules),
+    [activeInstruction, activeRules],
+  );
+  const promptText = shouldUseFallbackPrompt
+    ? fallbackPrompt
+    : promptData?.prompt ?? fallbackPrompt;
+
+  if (loadingSchema || loadingPrompt || (shouldUseFallbackPrompt && (loadingActiveInstruction || loadingActiveRules))) {
     return <LoadingState label="Đang tải cấu hình AI..." />;
   }
 
-  if (schemaError || promptError) {
+  if (
+    schemaError ||
+    promptError ||
+    (shouldUseFallbackPrompt && (activeInstructionError || activeRulesError))
+  ) {
     return <ErrorState message="Không thể tải thông tin schema hoặc prompt." />;
   }
 
@@ -178,7 +203,12 @@ const AiExtractionPage = () => {
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <p className="text-sm font-semibold text-slate-700">Prompt</p>
-              <textarea readOnly rows={12} value={promptData?.prompt ?? ''} className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 font-mono overflow-x-auto" />
+              <textarea
+                readOnly
+                rows={12}
+                value={promptText}
+                className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 font-mono overflow-x-auto"
+              />
             </div>
             <div>
               <p className="text-sm font-semibold text-slate-700">Schema đang dùng</p>
