@@ -41,8 +41,10 @@ app.get('/', (_req, res) => {
   res.json({ ok: true, service: 'ai-config-api' });
 });
 
+const apiRouter = express.Router();
+
 // Endpoint to return the latest prompt
-app.get('/prompt/latest', async (_req, res) => {
+const getLatestPrompt = async (_req: express.Request, res: express.Response) => {
   try {
     // TODO: Fetch instructions/rules/examples from Firestore and compose the prompt
     return res.json({
@@ -54,10 +56,12 @@ app.get('/prompt/latest', async (_req, res) => {
     console.error('Error fetching prompt', err);
     return res.status(500).json({ error: 'Failed to fetch prompt' });
   }
-});
+};
+
+apiRouter.get('/prompt/latest', getLatestPrompt);
 
 // Endpoint to return the active schema
-app.get('/schemas/active', async (_req, res) => {
+apiRouter.get('/schemas/active', async (_req, res) => {
   try {
     // TODO: Fetch the active JSON schema from Firestore
     return res.json({
@@ -72,7 +76,7 @@ app.get('/schemas/active', async (_req, res) => {
 });
 
 // Endpoint to perform AI extraction
-app.post('/ai/extract', async (req, res) => {
+apiRouter.post('/ai/extract', async (req, res) => {
   try {
     const { imageUrl } = req.body as { imageUrl?: string; overrides?: Record<string, unknown> };
     if (!imageUrl) {
@@ -88,6 +92,10 @@ app.post('/ai/extract', async (req, res) => {
     return res.status(500).json({ error: 'AI extraction failed' });
   }
 });
+
+// Mount API router both at root and /api for backward compatibility
+app.use('/', apiRouter);
+app.use('/api', apiRouter);
 
 // Export the Express app as an HTTP function
 export const api = onRequest(app);
