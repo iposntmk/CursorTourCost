@@ -1,6 +1,6 @@
 import { ReactNode, useMemo, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { AlignJustify, BarChart3, BookOpen, Bot, FileSpreadsheet, Layers3, ListTree, Map, Settings2 } from 'lucide-react';
+import { AlignJustify, X, BarChart3, BookOpen, Bot, FileSpreadsheet, Layers3, ListTree, Map, Settings2 } from 'lucide-react';
 import clsx from 'clsx';
 import { useApiKey } from '../../hooks/useApiKey';
 import { ApiKeyDialog } from '../settings/ApiKeyDialog';
@@ -29,6 +29,13 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-900">
+      {/* Mobile backdrop */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-20 bg-slate-900/50 lg:hidden"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
       <div className="lg:grid lg:grid-cols-[280px_1fr] min-h-screen">
         <aside
           className={clsx(
@@ -44,10 +51,10 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
             </div>
             <button
               type="button"
-              className="lg:hidden inline-flex items-center justify-center rounded-md border border-slate-200 p-2"
+              className="lg:hidden inline-flex items-center justify-center rounded-md border border-slate-200 p-3 min-h-[44px] min-w-[44px]"
               onClick={() => setMobileOpen(false)}
             >
-              <AlignJustify className="h-5 w-5" />
+              <X className="h-5 w-5" />
             </button>
           </div>
           <nav className="flex-1 overflow-y-auto px-4 py-6 space-y-1">
@@ -62,7 +69,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
                   to={item.to}
                   onClick={() => setMobileOpen(false)}
                   className={clsx(
-                    'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all',
+                    'flex items-center gap-3 rounded-lg px-3 py-3 text-sm font-medium transition-all min-h-[44px]',
                     isActive
                       ? 'bg-primary-50 text-primary-700 ring-1 ring-primary-100 shadow-sm'
                       : 'text-slate-600 hover:text-primary-600 hover:bg-primary-50/60',
@@ -87,7 +94,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
               <div className="flex items-center gap-3">
                 <button
                   type="button"
-                  className="lg:hidden inline-flex items-center justify-center rounded-md border border-slate-200 p-2"
+                  className="lg:hidden inline-flex items-center justify-center rounded-md border border-slate-200 p-3 min-h-[44px] min-w-[44px]"
                   onClick={() => setMobileOpen((prev) => !prev)}
                 >
                   <AlignJustify className="h-5 w-5" />
@@ -114,7 +121,7 @@ const AppLayout = ({ children }: { children: ReactNode }) => {
                   type="button"
                   onClick={() => setApiKeyDialogOpen(true)}
                   className={clsx(
-                    'inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition',
+                    'inline-flex items-center gap-2 rounded-lg border px-3 py-3 text-xs font-semibold transition min-h-[44px]',
                     apiKey
                       ? 'border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
                       : 'border-amber-300 bg-amber-50 text-amber-700 hover:bg-amber-100',

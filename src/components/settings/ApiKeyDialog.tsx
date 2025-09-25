@@ -56,8 +56,8 @@ export const ApiKeyDialog = ({ open, onClose }: ApiKeyDialogProps) => {
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-slate-900/50 px-4 py-6">
-      <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
+    <div className="fixed inset-0 z-[999] flex items-center justify-center bg-slate-900/50 px-4 py-6 sm:px-6">
+      <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl max-h-[90vh] overflow-y-auto">
         <div className="border-b border-slate-200 px-6 py-4">
           <h2 className="text-lg font-semibold text-slate-900">Cấu hình API key Gemini</h2>
           <p className="mt-1 text-sm text-slate-500">

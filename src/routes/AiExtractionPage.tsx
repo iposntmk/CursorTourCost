@@ -158,7 +158,7 @@ const AiExtractionPage = () => {
           <div className="grid gap-4 md:grid-cols-2">
             <div>
               <p className="text-sm font-semibold text-slate-700">Prompt</p>
-              <textarea readOnly rows={12} value={promptData?.prompt ?? ''} className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700" />
+              <textarea readOnly rows={12} value={promptData?.prompt ?? ''} className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 font-mono overflow-x-auto" />
             </div>
             <div>
               <p className="text-sm font-semibold text-slate-700">Schema đang dùng</p>
@@ -166,7 +166,7 @@ const AiExtractionPage = () => {
                 readOnly
                 rows={12}
                 value={schemaObject ? JSON.stringify(schemaObject, null, 2) : 'Chưa có schema đang dùng'}
-                className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700"
+                className="mt-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 font-mono overflow-x-auto"
               />
             </div>
           </div>
@@ -208,7 +208,7 @@ const AiExtractionPage = () => {
               readOnly
               rows={16}
               value={rawOutput}
-              className="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700"
+              className="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 font-mono overflow-x-auto"
             />
           </CardContent>
         </Card>

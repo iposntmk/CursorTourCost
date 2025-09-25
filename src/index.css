@@ -6,8 +6,16 @@
   color-scheme: light;
 }
 
+/* Prevent horizontal scroll on mobile */
+html, body {
+  overflow-x: hidden;
+}
+
 body {
   @apply bg-slate-50 text-slate-900 antialiased min-h-screen;
+  /* Improve text rendering on mobile */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 #root {
@@ -20,4 +28,23 @@ a {
 
 button:focus {
   @apply outline-none ring-2 ring-primary-400 ring-offset-2;
+}
+
+/* Improve focus visibility for accessibility */
+button:focus-visible,
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  @apply outline-none ring-2 ring-primary-400 ring-offset-2;
+}
+
+/* Ensure proper touch target sizes */
+@media (max-width: 768px) {
+  button, 
+  [role="button"], 
+  input[type="button"], 
+  input[type="submit"] {
+    min-height: 44px;
+    min-width: 44px;
+  }
 }
