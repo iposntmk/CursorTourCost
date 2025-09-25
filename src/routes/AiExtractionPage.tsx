@@ -380,7 +380,7 @@ const AiExtractionPage = () => {
             <CardTitle>
               <div>
                 <p className="text-sm font-semibold uppercase tracking-wide text-primary-600">Kết quả Gemini</p>
-                <h2 className="text-xl font-semibold text-slate-900">JSON trả về</h2>
+                <h2 className="text-xl font-semibold text-slate-900">Dữ liệu trích xuất</h2>
               </div>
             </CardTitle>
             {parsedJson ? (
@@ -394,9 +394,35 @@ const AiExtractionPage = () => {
             ) : null}
           </CardHeader>
           <CardContent>
-            {validationResult ? <p className="text-sm font-medium text-slate-600">{validationResult}</p> : null}
+            {/* Summary Stats */}
+            {parsedJson && typeof parsedJson === 'object' ? (
+              <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+                <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+                  <div className="text-sm font-medium text-blue-800">Tổng số trường</div>
+                  <div className="text-2xl font-bold text-blue-900">{Object.keys(parsedJson).length}</div>
+                </div>
+                <div className="rounded-lg border border-green-200 bg-green-50 px-4 py-3">
+                  <div className="text-sm font-medium text-green-800">Trường có dữ liệu</div>
+                  <div className="text-2xl font-bold text-green-900">
+                    {Object.values(parsedJson).filter(v => v && String(v).trim()).length}
+                  </div>
+                </div>
+                <div className="rounded-lg border border-purple-200 bg-purple-50 px-4 py-3">
+                  <div className="text-sm font-medium text-purple-800">Trường trống</div>
+                  <div className="text-2xl font-bold text-purple-900">
+                    {Object.values(parsedJson).filter(v => !v || !String(v).trim()).length}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {validationResult ? (
+              <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3">
+                <p className="text-sm font-medium text-green-800">{validationResult}</p>
+              </div>
+            ) : null}
             {validationErrors.length > 0 ? (
-              <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
+              <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-600">
                 <p className="font-semibold">Chi tiết lỗi:</p>
                 <ul className="mt-2 list-disc pl-5">
                   {validationErrors.map((error, index) => (
@@ -405,12 +431,55 @@ const AiExtractionPage = () => {
                 </ul>
               </div>
             ) : null}
-            <textarea
-              readOnly
-              rows={16}
-              value={rawOutput}
-              className="mt-3 w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 font-mono overflow-x-auto"
-            />
+            
+            {/* Structured Data Display */}
+            {parsedJson && typeof parsedJson === 'object' ? (
+              <div className="mb-6">
+                <h3 className="mb-3 text-lg font-semibold text-slate-800">Dữ liệu đã phân tích</h3>
+                <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {Object.entries(parsedJson).map(([key, value]) => (
+                      <div key={key} className="flex flex-col gap-1">
+                        <label className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                          {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                        </label>
+                        <div className="rounded-md bg-slate-50 px-3 py-2 text-sm text-slate-800">
+                          {typeof value === 'object' && value !== null ? (
+                            <pre className="whitespace-pre-wrap font-mono text-xs">
+                              {JSON.stringify(value, null, 2)}
+                            </pre>
+                          ) : (
+                            <span className={value ? 'text-slate-900' : 'text-slate-400 italic'}>
+                              {value || 'Không có dữ liệu'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {/* Raw Output */}
+            <div>
+              <h3 className="mb-3 text-lg font-semibold text-slate-800">Kết quả thô từ Gemini</h3>
+              <div className="relative">
+                <textarea
+                  readOnly
+                  rows={12}
+                  value={rawOutput}
+                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 font-mono overflow-x-auto resize-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => navigator.clipboard.writeText(rawOutput)}
+                  className="absolute top-2 right-2 rounded-md bg-slate-200 px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-300 transition"
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
           </CardContent>
         </Card>
       ) : null}
