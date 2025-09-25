@@ -78,15 +78,33 @@ apiRouter.get('/schemas/active', async (_req, res) => {
 // Endpoint to perform AI extraction
 apiRouter.post('/ai/extract', async (req, res) => {
   try {
-    const { imageUrl } = req.body as { imageUrl?: string; overrides?: Record<string, unknown> };
-    if (!imageUrl) {
-      return res.status(400).json({ error: 'imageUrl is required' });
+    const {
+      imageUrl,
+      imageBase64,
+      imageName,
+    } = req.body as {
+      imageUrl?: string;
+      imageBase64?: string;
+      imageName?: string;
+    };
+
+    // Check if we have either imageUrl or imageBase64
+    if (!imageUrl && !imageBase64) {
+      return res.status(400).json({
+        error: 'Either imageUrl or imageBase64 is required',
+      });
     }
+
     // TODO: Compose the prompt (e.g. call /prompt/latest internally)
-    // TODO: Call your AI model (Gemini API) with the imageUrl and prompt
+    // TODO: Call your AI model (Gemini API) with the image data and prompt
     // TODO: Validate the AI result against the active schema
+
     // Return a placeholder response for now
-    return res.json({ data: 'TODO: AI extraction result' });
+    return res.json({
+      data: 'TODO: AI extraction result',
+      imageSource: imageUrl ? 'url' : 'base64',
+      imageName: imageName || 'unknown',
+    });
   } catch (err) {
     console.error('Error in AI extraction', err);
     return res.status(500).json({ error: 'AI extraction failed' });
