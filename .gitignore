@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Secrets and local configs
+# Ignore accidentally created local secret file
+api key
