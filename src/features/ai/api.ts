@@ -1,6 +1,6 @@
 import { STORAGE_KEYS } from '../../constants/storageKeys';
 
-const DEFAULT_API_BASE = 'https://asia-southeast1-quantum-ratio-468010-d4.cloudfunctions.net/api';
+const DEFAULT_API_BASE = 'https://api-l6zybqif7q-as.a.run.app';
 
 const resolveApiBaseUrl = () => {
   const candidates = [

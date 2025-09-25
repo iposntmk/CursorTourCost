@@ -38,10 +38,10 @@ npm run dev
 Tạo file `.env.local` (hoặc cập nhật biến môi trường tương ứng) với cấu hình API:
 
 ```
-VITE_API_BASE=https://asia-southeast1-quantum-ratio-468010-d4.cloudfunctions.net/api
+VITE_API_BASE=https://api-l6zybqif7q-as.a.run.app
 ```
 
-Khi triển khai production, thay giá trị trên bằng domain thực tế của Cloud Functions. Nếu cần gọi emulator
+Hàm `resolveApiBaseUrl` trong `src/features/ai/api.ts` sẽ tự thêm hậu tố `/api` nếu cần, nên chỉ cần cung cấp domain gốc của dịch vụ Cloud Run. Khi triển khai production, thay giá trị trên bằng domain thực tế của Cloud Run. Nếu cần gọi emulator
 local, đặt `VITE_API_BASE=http://127.0.0.1:5001/<project>/<region>/api`.
 
 Ứng dụng đọc cấu hình Firebase trực tiếp từ `src/lib/firebase.ts`. Có thể bật emulator bằng cách set `VITE_USE_FIREBASE_EMULATORS=true` trong `.env.local`.
